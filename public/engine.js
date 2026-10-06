@@ -277,40 +277,43 @@ function findMatches(A, list) {
   return { best: results[0], worst: results[results.length - 1], all: results };
 }
 
-const BEST_OPEN = [
-  "어머어머… 이건 신령님이 직접 엮어준 조합인데?",
-  "부적 쓰다가 손 떨렸잖아요. 이 조합 뭐야…",
-  "와 소름. 이 둘은 전생에 무조건 아는 사이였음.",
-  "이거 찐이에요. 신령님이 지금 박수 치고 계심.",
-];
-const WORST_OPEN = [
-  "잠깐만… 신령님이 고개를 절레절레 하시는데요?",
-  "이 조합은… 부적 하나로는 안 될 것 같아요.",
-  "어우, 기운끼리 서로 할퀴고 있어요.",
-  "같은 방에 두면 안 되는 조합, 축하드립니다…",
-];
-const BEST_CLOSE = [
-  "이 인연 놓치면 3대가 후회함. 부적은 지갑에 꼭 넣고 다니세요.",
-  "오늘부터 이 사람 이름 들리면 귀 쫑긋 하세요. 신호 온 거예요.",
-  "효과는 보장 못 하지만 기분은 보장합니다. 🧧",
-];
-const WORST_CLOSE = [
-  "마주치면 일단 웃으면서 지나가세요. 그게 최선입니다.",
-  "굳이 엮여야 한다면 단톡방까지만. 갠톡 금지.",
-  "이 부적 붙이면 액운 50% 감소 (신령님 피셜).",
+// 점수 구간별 부적 + 무당 멘트. 최고/최악 상관없이 점수만으로 정해짐
+// open: 리딩 첫 멘트, close: 마무리 멘트 (조합마다 하나씩 고정으로 골라짐)
+const TIERS = [
+  { min: 90, hanja: "天生緣分", ko: "천생연분", fu: "合婚符", fuKo: "합혼부",
+    open: ["어머어머… 이건 신령님이 직접 엮어준 조합인데?", "와 소름. 이 둘은 전생에 무조건 아는 사이였음.", "부적 쓰다가 손 떨렸잖아요. 이 조합 뭐야…"],
+    close: ["이 인연 놓치면 3대가 후회함. 부적은 지갑에 꼭 넣고 다니세요.", "오늘부터 이 사람 이름 들리면 귀 쫑긋 하세요. 신호 온 거예요."] },
+  { min: 80, hanja: "百年佳約", ko: "백년가약", fu: "愛情符", fuKo: "애정부",
+    open: ["이거 찐이에요. 신령님이 지금 박수 치고 계심.", "오래 볼수록 더 좋아지는 조합. 백년가약 각이에요."],
+    close: ["싸워도 결국 화해하는 사이. 먼저 사과하는 쪽이 이겨요.", "지금 이 인연, 아껴 쓰세요. 오래 갑니다."] },
+  { min: 70, hanja: "琴瑟相和", ko: "금슬상화", fu: "和合符", fuKo: "화합부",
+    open: ["합이 잘 맞아요. 같이 있으면 둘 다 편해지는 사이.", "서로 부족한 데를 딱딱 채워주는 조합이에요."],
+    close: ["사소한 건 맞춰주고, 큰 건 같이 정하면 만사형통.", "부적은 둘이 하나씩 나눠 가지세요. 효과 두 배."] },
+  { min: 60, hanja: "吉緣相逢", ko: "길연상봉", fu: "因緣符", fuKo: "인연부",
+    open: ["좋은 인연은 맞아요. 다만 조금 더 알아가야 하는 사이.", "첫인상보다 두 번째 만남이 더 좋은 타입이에요."],
+    close: ["먼저 말 걸면 반은 성공. 나머지 반은 꾸준함.", "천천히 친해질수록 단단해지는 인연이에요."] },
+  { min: 50, hanja: "無難平安", ko: "무난평안", fu: "平安符", fuKo: "평안부",
+    open: ["엄청 끌리는 건 아닌데, 같이 있으면 탈은 없는 사이예요.", "불꽃은 없지만 평화는 있어요. 무난함도 복이에요."],
+    close: ["큰 기대보다 편한 사이로 지내면 딱 좋아요.", "가끔 안부 묻는 사이로 오래 가요."] },
+  { min: 40, hanja: "相剋注意", ko: "상극주의", fu: "和解符", fuKo: "화해부",
+    open: ["잠깐만… 신령님이 고개를 갸웃하시는데요?", "기운끼리 살짝 부딪혀요. 말 한마디에 오해가 생기기 쉬운 사이."],
+    close: ["말투만 조심하면 생각보다 괜찮아요. 서운한 건 바로 말하기.", "가까이보단 적당한 거리에서 오래 가는 사이예요."] },
+  { min: 30, hanja: "怨嗔注意", ko: "원진주의", fu: "解怨符", fuKo: "해원부",
+    open: ["이 조합은… 부적 하나로는 안 될 것 같아요.", "어우, 기운끼리 서로 할퀴고 있어요."],
+    close: ["굳이 엮여야 한다면 단톡방까지만. 갠톡 금지.", "같이 있을 땐 둘 다 한 템포 쉬고 말하기. 부적은 필수."] },
+  { min: 0, hanja: "厄運退散", ko: "액운퇴산", fu: "防厄符", fuKo: "방액부",
+    open: ["같은 방에 두면 안 되는 조합, 축하드립니다…", "신령님이 말없이 부적을 한 장 더 꺼내셨어요."],
+    close: ["마주치면 일단 웃으면서 지나가세요. 그게 최선입니다.", "이 부적 붙이면 액운 50% 감소 (신령님 피셜)."] },
 ];
 
-// 점수 구간별 부적. 최고/최악 상관없이 점수만으로 정해짐
-const TIERS = [
-  { min: 90, hanja: "天生緣分", ko: "천생연분", fu: "合婚符", fuKo: "합혼부" },
-  { min: 80, hanja: "百年佳約", ko: "백년가약", fu: "愛情符", fuKo: "애정부" },
-  { min: 70, hanja: "琴瑟相和", ko: "금슬상화", fu: "和合符", fuKo: "화합부" },
-  { min: 60, hanja: "吉緣相逢", ko: "길연상봉", fu: "因緣符", fuKo: "인연부" },
-  { min: 50, hanja: "無難平安", ko: "무난평안", fu: "平安符", fuKo: "평안부" },
-  { min: 40, hanja: "相剋注意", ko: "상극주의", fu: "和解符", fuKo: "화해부" },
-  { min: 30, hanja: "怨嗔注意", ko: "원진주의", fu: "解怨符", fuKo: "해원부" },
-  { min: 0, hanja: "厄運退散", ko: "액운퇴산", fu: "防厄符", fuKo: "방액부" },
-];
+// 최고인데 점수가 낮거나, 최악인데 점수가 높을 때 앞에 붙이는 한 줄
+function contextLine(kind, total) {
+  if (kind === "best" && total < 50) return "솔직히 다 고만고만한데, 이 중에선 이 사람이 제일 나아요.";
+  if (kind === "best" && total < 60) return "이 명단 안에서는 제일 잘 맞는 상대예요.";
+  if (kind === "worst" && total >= 60) return "다 괜찮은 편인데, 굳이 고르자면 이 사람이 제일 덜 맞아요.";
+  if (kind === "worst" && total >= 50) return "최악이라기엔 무난한데, 이 중에선 제일 덜 맞아요.";
+  return "";
+}
 const tierOf = (total) => TIERS.find((t) => total >= t.min);
 
 function shortReason(kind, r) {
@@ -325,11 +328,13 @@ function shortReason(kind, r) {
 
 function reading(kind, A, r) {
   const seed = hash(A.id + r.partner.id);
+  const tier = tierOf(r.total);
+  const ctx = contextLine(kind, r.total);
   return {
-    open: pick(kind === "best" ? BEST_OPEN : WORST_OPEN, seed),
-    close: pick(kind === "best" ? BEST_CLOSE : WORST_CLOSE, seed >>> 3),
-    tier: tierOf(r.total),
-    grade: tierOf(r.total).ko,
+    open: (ctx ? ctx + " " : "") + pick(tier.open, seed),
+    close: pick(tier.close, seed >>> 3),
+    tier,
+    grade: tier.ko,
     serial: String(hash(A.id + r.partner.id + kind) % 10000).padStart(4, "0"),
     short: shortReason(kind, r),
   };
