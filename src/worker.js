@@ -1,5 +1,5 @@
 // 사이트 파일(public/)은 Cloudflare가 그대로 내보내고,
-// /api/birthdays, /api/hours 만 이 코드가 처리: 친구들이 입력한 생일·태어난 시를 KV에 모아 모두에게 공유.
+// /api/birthdays, /api/hours, /api/mbti 만 이 코드가 처리: 친구들이 입력한 생일·태어난 시·MBTI를 KV에 모아 모두에게 공유.
 const ID_RE = /^[a-z0-9_-]{1,40}$/;
 const BIRTH_RE = /^(2009|2010)-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/; // 2026년 기준 2학년=2009, 1학년=2010
 const HOURS = ["자시", "축시", "인시", "묘시", "진시", "사시", "오시", "미시", "신시", "유시", "술시", "해시"];
@@ -20,6 +20,8 @@ function isRealDate(birth) {
 const ROUTES = {
   "/api/birthdays": { key: "birthdays", field: "birth", valid: (v) => BIRTH_RE.test(v) && isRealDate(v) },
   "/api/hours": { key: "hours", field: "hour", valid: (v) => HOURS.includes(v) },
+  // 궁예한 MBTI를 본인이 고친 값
+  "/api/mbti": { key: "mbti", field: "mbti", valid: (v) => /^[EI][SN][TF][JP]$/.test(v) },
 };
 
 export default {

@@ -83,6 +83,36 @@ const SAM_HAP = [[[8, 0, 4], 4], [[11, 3, 7], 0], [[2, 6, 10], 1], [[5, 9, 1], 3
 const isYukHap = (a, b) => YUK_HAP.some(([x, y]) => (x === a && y === b) || (x === b && y === a));
 const samHapGroup = (a, b) => (a !== b ? SAM_HAP.find(([g]) => g.includes(a) && g.includes(b)) : null);
 const isChung = (a, b) => Math.abs(a - b) === 6;
+// 원진(怨嗔): 자미·축오·인유·묘신·진해·사술 — 이유 없이 서로 거슬리는 관계
+const WONJIN = [[0, 7], [1, 6], [2, 9], [3, 8], [4, 11], [5, 10]];
+const isWonjin = (a, b) => WONJIN.some(([x, y]) => (x === a && y === b) || (x === b && y === a));
+
+/* 십성(十星): 상대 일간이 나에게 어떤 의미인지 */
+function tenGod(me, other) {
+  const em = stemEl(me), eo = stemEl(other), same = me % 2 === other % 2;
+  if (em === eo) return same ? "비견" : "겁재";
+  if ((em + 1) % 5 === eo) return same ? "식신" : "상관";
+  if ((em + 2) % 5 === eo) return same ? "편재" : "정재";
+  if ((eo + 2) % 5 === em) return same ? "편관" : "정관";
+  return same ? "편인" : "정인";
+}
+// [한자, 점수, 짧은 이유, 풀이] — 정관(여)·정재(남)는 전통적으로 배우자를 뜻하는 별
+const TEN_GOD = {
+  정관: (A, B) => A.gender === "여"
+    ? ["正官", 4, "정관: 딱 배우자 자리", `${A.name}에게 ${josa(B.name, "은/는")} 정관(正官). 전통 사주에서 여자에게 정관은 '남편 자리'에 앉는 별이라, 딱 배우자감으로 읽히는 사람이에요.`]
+    : ["正官", 3, "정관: 나를 잡아주는 사람", `${A.name}에게 ${josa(B.name, "은/는")} 정관(正官). 나를 바르게 잡아주는 사람이라, 같이 있으면 ${josa(A.name, "이/가")} 철드는 사이예요.`],
+  정재: (A, B) => A.gender === "남"
+    ? ["正財", 4, "정재: 딱 배우자 자리", `${A.name}에게 ${josa(B.name, "은/는")} 정재(正財). 전통 사주에서 남자에게 정재는 '아내 자리'에 앉는 별이라, 딱 배우자감으로 읽히는 사람이에요.`]
+    : ["正財", 3, "정재: 아끼게 되는 사람", `${A.name}에게 ${josa(B.name, "은/는")} 정재(正財). 내가 아끼고 챙기게 되는 사람. 꾸준하고 안정적인 인연이에요.`],
+  편관: (A, B) => ["偏官", -2, "편관: 휘어잡는 기운", `${A.name}에게 ${josa(B.name, "은/는")} 편관(偏官), 일명 칠살. 나를 강하게 휘어잡는 기운이라 끌리긴 하는데 같이 있으면 피곤할 수 있어요.`],
+  편재: (A, B) => ["偏財", 1, "편재: 같이 놀 때 최고", `${A.name}에게 ${josa(B.name, "은/는")} 편재(偏財). 자유로운 인연이라 같이 놀 땐 최고, 매일 붙어 있긴 버거울 수 있어요.`],
+  정인: (A, B) => ["正印", 3, "정인: 나를 품어주는 사람", `${A.name}에게 ${josa(B.name, "은/는")} 정인(正印). 나를 품어주는 사람이라, 옆에 있으면 엄마 품 같은 안정감이 들어요.`],
+  편인: (A, B) => ["偏印", -1, "편인: 생각이 많아지는 사이", `${A.name}에게 ${josa(B.name, "은/는")} 편인(偏印). 신기하게 끌리는데, 같이 있으면 괜히 생각이 많아지는 사람이에요.`],
+  식신: (A, B) => ["食神", 2, "식신: 같이 있으면 편한 사람", `${A.name}에게 ${josa(B.name, "은/는")} 식신(食神). 내가 편하게 웃게 되는 사람. 같이 먹고 노는 게 제일 행복한 사이예요.`],
+  상관: (A, B) => ["傷官", -2, "상관: 장난이 선 넘기 쉬움", `${A.name}에게 ${josa(B.name, "은/는")} 상관(傷官). 이 사람 앞에선 말빨이 세져서, 장난이 선을 넘기 쉬워요.`],
+  비견: (A, B) => ["比肩", 1, "비견: 어깨 나란히 하는 친구", `${A.name}에게 ${josa(B.name, "은/는")} 비견(比肩). 어깨 나란히 하는 친구 같은 사이예요.`],
+  겁재: (A, B) => ["劫財", -2, "겁재: 은근한 라이벌", `${A.name}에게 ${josa(B.name, "은/는")} 겁재(劫財). 은근히 경쟁하게 되는 사이라, 같은 걸 두고 신경전이 붙기 쉬워요.`],
+};
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 const pick = (arr, seed) => arr[seed % arr.length];
 const hash = (s) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
@@ -122,6 +152,15 @@ function scoreSaju(A, B) {
       `${CTRL_TEXT[ce]} ${josa(c.name, "이/가")} ${josa(t.name, "을/를")} 누르는 상극 관계. ${t.name} 입장에선 같이 있으면 묘하게 숨이 막힐 수 있어요.`);
   }
 
+  // 십성: 서로에게 어떤 별인지 (양쪽 다 봄, 합계 -4 ~ +6)
+  let tg = 0;
+  for (const [X, Y] of [[A, B], [B, A]]) {
+    const [, d, short, text] = TEN_GOD[tenGod(X.pillars.day.s, Y.pillars.day.s)](X, Y);
+    const dd = clamp(d, -4 - tg, 6 - tg);
+    tg += dd;
+    add(dd, short, text);
+  }
+
   const da = pa.day.b, db = pb.day.b;
   const dPair = `${BRANCHES[da]}${BRANCHES_H[da]}-${BRANCHES[db]}${BRANCHES_H[db]}`;
   if (isYukHap(da, db)) {
@@ -134,6 +173,9 @@ function scoreSaju(A, B) {
   } else if (isChung(da, db)) {
     add(-7, "배우자 자리 충돌",
       `일지 ${dPair} 충! 배우자 자리끼리 정면충돌이라 같이 있으면 사소한 걸로 자주 부딪혀요.`);
+  } else if (isWonjin(da, db)) {
+    add(-5, "배우자 자리 원진살",
+      `둘이 일지 ${dPair} 원진살이 있어요… 원진은 '이유 없이 서로 거슬리는' 살이라, 잘 지내다가도 괜히 서운해지는 사이예요.`);
   }
 
   const ya = pa.year.b, yb = pb.year.b;
@@ -142,6 +184,18 @@ function scoreSaju(A, B) {
     add(3, "띠 궁합도 굿", `띠로 봐도 ${zodiac}는 합이 드는 사이. 첫인상부터 호감.`);
   } else if (isChung(ya, yb)) {
     add(-3, "띠끼리 충", `띠로 보면 ${zodiac}는 충. 첫 만남부터 뭔가 삐걱일 수 있어요.`);
+  } else if (isWonjin(ya, yb)) {
+    add(-3, "띠 원진살", `띠로 보면 ${zodiac}는 원진 관계. 이유 없이 서로 신경 쓰이는 띠 궁합이에요.`);
+  }
+
+  // 시지(자녀·말년 자리): 둘 다 태어난 시를 알 때만
+  if (pa.hour && pb.hour) {
+    const ha = pa.hour.b, hb = pb.hour.b;
+    const hPair = `${BRANCHES[ha]}${BRANCHES_H[ha]}-${BRANCHES[hb]}${BRANCHES_H[hb]}`;
+    if (isYukHap(ha, hb)) add(3, "시지 육합", `태어난 시끼리 ${hPair} 육합. 시지는 말년 자리라, 오래 볼수록 더 잘 맞는 사이예요.`);
+    else if (samHapGroup(ha, hb)) add(2, "시지 삼합", `태어난 시끼리 ${hPair} 삼합. 나이 들어서도 같은 방향을 보는 사이예요.`);
+    else if (isChung(ha, hb)) add(-3, "시지 충", `태어난 시끼리 ${hPair} 충. 시간이 갈수록 생활 리듬이 부딪힐 수 있어요.`);
+    else if (isWonjin(ha, hb)) add(-2, "시지 원진", `태어난 시끼리 ${hPair} 원진. 오래 붙어 있으면 사소한 습관이 거슬리기 쉬워요.`);
   }
 
   let fill = 0;

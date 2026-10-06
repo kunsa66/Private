@@ -14,12 +14,16 @@ const BIRTH_YEAR = { 1: 2010, 2: 2009 }; // 2026년 기준 1학년=2010년생, 2
 const SHARED = {
   birth: { api: "/api/birthdays", note: "birthNote" },
   hour: { api: "/api/hours", note: "hourNote" },
+  // MBTI는 data.js 값이 궁예라서, 본인이 고친 값이 있으면 그게 우선
+  mbti: { api: "/api/mbti", note: "mbtiNote", override: true },
 };
 
 function applyShared(c, field, value) {
-  if (c[field] || !value) return;
+  if (!value) return;
+  const opt = SHARED[field];
+  if (opt.override ? c[opt.note] : c[field]) return;
   c[field] = value;
-  c[SHARED[field].note] = "친구가 입력";
+  c[opt.note] = field === "mbti" ? "본인 확인" : "친구가 입력";
   refreshPillars(c);
 }
 
@@ -36,7 +40,7 @@ async function saveShared(c, field, value) {
     const r = await fetch(SHARED[field].api, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: c.id, [field]: value }) });
     const res = await r.json();
     // 다른 친구가 먼저 입력해 둔 값이 있으면 그걸 따름
-    if (res[field] && res[field] !== c[field]) { c[field] = ""; applyShared(c, field, res[field]); }
+    if (res[field] && res[field] !== c[field]) { c[field] = ""; c[SHARED[field].note] = ""; applyShared(c, field, res[field]); }
   } catch (e) { /* 저장 실패해도 이번 결과는 입력한 값으로 진행 */ }
 }
 
@@ -190,6 +194,20 @@ function profileLine(c) {
   return `${c.grade}학년 · ${AGE[c.grade]}세 · ${esc(c.gender || "")}`;
 }
 
+const MBTI_TYPES = ["ISTJ", "ISFJ", "INFJ", "INTJ", "ISTP", "ISFP", "INFP", "INTP", "ESTP", "ESFP", "ENFP", "ENTP", "ESTJ", "ESFJ", "ENFJ", "ENTJ"];
+const mbtiTag = (c) => `${esc(c.mbti)} ${c.mbtiNote ? "(본인 확인)" : "(궁예)"}`;
+// 궁예 MBTI는 결과 화면에서 본인이 고칠 수 있음 (한 번 고치면 모두에게 반영)
+function mbtiFix(A) {
+  if (A.mbtiNote) return "";
+  return `<div class="hour-add">
+    <label for="mbti-fix">MBTI는 궁예예요. 다르면 고쳐주세요</label>
+    <select id="mbti-fix" data-id="${esc(A.id)}">
+      <option value="">${esc(A.mbti)} 맞음 · 다르면 고르기</option>
+      ${MBTI_TYPES.filter((t) => t !== A.mbti).map((t) => `<option value="${t}">${t}</option>`).join("")}
+    </select>
+  </div>`;
+}
+
 function selfPanel(A) {
   const p = A.pillars;
   const head = `<div class="who">
@@ -207,9 +225,10 @@ function selfPanel(A) {
     return `<div class="panel"><div class="panel-in">${head}
       <div class="section-title">사주 원국</div>
       <p class="no-saju">생일 정보가 없어서 사주는 보지 않았어요.<br>궁합은 성향과 MBTI로만 봐요.</p>
-      <div class="meta">${esc(A.mbti)}</div>
+      <div class="meta">${mbtiTag(A)}</div>
       <div class="section-title">타고난 기운</div>
       <ul class="self-lines">${tags}</ul>
+      ${mbtiFix(A)}
     </div></div>`;
   }
 
@@ -227,7 +246,7 @@ function selfPanel(A) {
   return `<div class="panel"><div class="panel-in">${head}
     <div class="section-title">사주 원국</div>
     <div class="pillars${p.hour ? " four" : ""}">${pillarCell("년주", p.year)}${pillarCell("월주", p.month)}${pillarCell("일주", p.day)}${p.hour ? pillarCell("시주", p.hour) : ""}</div>
-    <div class="meta">${date} · ${esc(A.birthNote || "")}${hourInfo}<br>${p.animal}띠 · ${esc(A.mbti)}</div>
+    <div class="meta">${date} · ${esc(A.birthNote || "")}${hourInfo}<br>${p.animal}띠 · ${mbtiTag(A)}</div>
     ${addHour}
     <div class="section-title">오행 분포</div>
     <div class="el-bars">${p.counts.map((c, e) => `<div class="el-bar">${c}<i style="height:${(c / max) * 64}px;background:${ELEMENT_COLORS[e]}"></i><b>${ELEMENTS_H[e]}<small>${ELEMENTS[e]}</small></b></div>`).join("")}</div>
@@ -238,6 +257,7 @@ function selfPanel(A) {
       <li><b>부족 기운</b><span>${s.lack.split(" / ").map(esc).join("<br>")}</span></li>
       ${tags}
     </ul>
+    ${mbtiFix(A)}
   </div></div>`;
 }
 
@@ -299,13 +319,15 @@ async function renderCard(kind, A, r, token) {
 const IN_FRAME = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
 
 // 결과 화면에서 태어난 시를 고르면: 저장 → 사주 다시 계산 → 결과 다시 그림 (스크롤 위치 유지)
+// MBTI를 고쳐도 같은 방식
 $("result").addEventListener("change", (e) => {
-  if (e.target.id !== "hour-add" || !e.target.value) return;
+  const field = { "hour-add": "hour", "mbti-fix": "mbti" }[e.target.id];
+  if (!field || !e.target.value) return;
   const A = CHARACTERS.find((c) => c.id === e.target.dataset.id);
   if (!A) return;
   const y = window.scrollY;
   e.target.disabled = true;
-  saveShared(A, "hour", e.target.value).then(() => {
+  saveShared(A, field, e.target.value).then(() => {
     renderResult(A, findMatches(A, CHARACTERS));
     window.scrollTo(0, y);
   });
