@@ -1,0 +1,5 @@
+deploy/
+deploy.zip
+.wrangler/
+node_modules/
+.claude/
