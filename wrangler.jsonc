@@ -1,11 +1,18 @@
-// Cloudflare 배포 설정: GitHub main에 올라오면 public 폴더를 그대로 사이트로 배포
+// Cloudflare 배포 설정: GitHub main에 올라오면 자동 배포
 {
   // Cloudflare 대시보드의 프로젝트(Worker) 이름과 같아야 함 → 주소: private.kunsa6667.workers.dev
   "name": "private",
+  "main": "src/worker.js",
   "compatibility_date": "2026-10-01",
   // workers.dev 공개 주소를 항상 켜둠
   "workers_dev": true,
+  // 사이트 파일은 public 폴더 그대로. /api/birthdays 만 src/worker.js가 처리
   "assets": {
-    "directory": "./public"
-  }
+    "directory": "./public",
+    "binding": "ASSETS"
+  },
+  // 친구들이 입력한 생일 저장소 (Workers KV: pemibu-birthdays)
+  "kv_namespaces": [
+    { "binding": "BIRTHDAYS", "id": "fd4312fc41914ed282617de68c0449cd" }
+  ]
 }

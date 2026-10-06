@@ -7,6 +7,33 @@ const AGE = { 1: 17, 2: 18 };
 CHARACTERS.forEach((c) => (c.pillars = c.birth ? getPillars(c.birth) : null));
 try { localStorage.removeItem("pemibu-bday"); } catch (e) { /* 예전 버전의 생일 입력 기록 정리 */ }
 
+/* 친구들이 입력한 생일: 서버(/api/birthdays)에 모아서 모두에게 공유.
+   data.js에 생일이 있으면 항상 그게 우선. */
+const BIRTH_YEAR = { 1: 2010, 2: 2009 }; // 2026년 기준 1학년=2010년생, 2학년=2009년생
+const API = "/api/birthdays";
+
+function applySharedBirthday(c, birth) {
+  if (c.birth || !birth) return;
+  c.birth = birth;
+  c.birthNote = "친구가 입력";
+  c.pillars = getPillars(birth);
+}
+
+fetch(API, { cache: "no-store" })
+  .then((r) => (r.ok ? r.json() : {}))
+  .then((map) => CHARACTERS.forEach((c) => applySharedBirthday(c, map[c.id])))
+  .catch(() => { /* 내 PC 미리보기(서버실행.bat)에는 저장소가 없음 → 그냥 넘어감 */ });
+
+async function saveSharedBirthday(c, birth) {
+  applySharedBirthday(c, birth);
+  try {
+    const r = await fetch(API, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: c.id, birth }) });
+    const res = await r.json();
+    // 다른 친구가 먼저 입력해 둔 생일이 있으면 그걸 따름
+    if (res.birth && res.birth !== c.birth) { c.birth = ""; applySharedBirthday(c, res.birth); }
+  } catch (e) { /* 저장 실패해도 이번 결과는 입력한 생일로 진행 */ }
+}
+
 function show(id) {
   document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
   $(id).classList.add("active");
@@ -42,16 +69,70 @@ function renderRoster() {
 }
 renderRoster();
 
+/* 생일칸 (생일 정보가 없는 사람을 골랐을 때만, 선택 입력) */
+let pending = null;
+let bdayGrade = 2;
+
+$("bday-m").innerHTML = `<option value="">월</option>` + Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}">${i + 1}월</option>`).join("");
+function fillDays() {
+  const m = Number($("bday-m").value);
+  const max = m ? new Date(BIRTH_YEAR[bdayGrade], m, 0).getDate() : 31;
+  const keep = Number($("bday-d").value);
+  $("bday-d").innerHTML = `<option value="">일</option>` + Array.from({ length: max }, (_, i) => `<option value="${i + 1}">${i + 1}일</option>`).join("");
+  if (keep && keep <= max) $("bday-d").value = String(keep);
+}
+function setBdayGrade(g) {
+  bdayGrade = g;
+  document.querySelectorAll("#bday-grade button").forEach((b) => b.classList.toggle("on", Number(b.dataset.g) === g));
+  fillDays();
+}
+$("bday-grade").onclick = (e) => { const b = e.target.closest("button"); if (b) setBdayGrade(Number(b.dataset.g)); };
+$("bday-m").onchange = fillDays;
+
+function openBday(c) {
+  pending = c;
+  $("name-input").value = c.name;
+  $("bday-note").textContent = `${c.name}의 생일 정보가 없어요. 알면 골라주세요. 입력하면 모두의 궁합에 사주가 반영돼요. 모르면 그냥 점지를 누르세요.`;
+  $("bday-m").value = "";
+  setBdayGrade(c.grade);
+  $("bday").hidden = false;
+}
+function closeBday() {
+  pending = null;
+  $("bday").hidden = true;
+}
+
+// 생일이 없는 사람은 한 번 멈춰서 생일칸을 보여줌 (입력은 선택)
+function choose(c) {
+  if (c.birth) { closeBday(); runLoading(c); return; }
+  if (pending !== c) { openBday(c); return; }
+  const m = Number($("bday-m").value), d = Number($("bday-d").value);
+  closeBday();
+  if (m && d) {
+    const birth = `${BIRTH_YEAR[bdayGrade]}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    saveSharedBirthday(c, birth).then(() => runLoading(c));
+  } else {
+    runLoading(c);
+  }
+}
+
 function goInput() {
   $("name-input").value = "";
   $("name-err").textContent = "";
+  closeBday();
   renderRoster();
   show("s-input");
   focusInput();
 }
 document.querySelectorAll("[data-back]").forEach((b) => (b.onclick = goInput));
 
-$("name-input").oninput = () => { $("name-err").textContent = ""; renderRoster(); };
+$("name-input").oninput = () => {
+  $("name-err").textContent = "";
+  const c = findChar($("name-input").value);
+  if (c && !c.birth) { if (pending !== c) openBday(c); }
+  else if (pending) closeBday();
+  renderRoster();
+};
 
 $("name-form").onsubmit = (e) => {
   e.preventDefault();
@@ -61,11 +142,13 @@ $("name-form").onsubmit = (e) => {
   const hits = CHARACTERS.filter((x) => norm(x.name).includes(n));
   const c = findChar(q) || (hits.length === 1 ? hits[0] : null);
   if (!c) { $("name-err").textContent = "명단에 없는 이름이에요. 아래에서 골라주세요."; return; }
-  runLoading(c);
+  choose(c);
 };
 $("s-input").addEventListener("click", (e) => {
   const chip = e.target.closest(".chip");
-  if (chip) { $("name-input").value = chip.dataset.n; runLoading(findChar(chip.dataset.n)); }
+  if (!chip) return;
+  $("name-err").textContent = "";
+  choose(findChar(chip.dataset.n));
 });
 
 /* 분석 중 연출 */
