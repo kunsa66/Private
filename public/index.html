@@ -3,13 +3,22 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<script>
+  // 폰 브라우저가 '데스크톱 사이트' 모드면 PC 폭(약 980px)으로 그려서 화면이 작아짐 → 폰 폭에 맞게 확대
+  (function () {
+    var s = Math.min(screen.width, screen.height), w = window.innerWidth;
+    if (window.matchMedia("(pointer: coarse)").matches && s < 600 && w > s * 1.5) {
+      document.documentElement.style.zoom = (w / s).toFixed(3);
+    }
+  })();
+</script>
 <title>폐미부 궁합소</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Hahmlet:wght@500;700;800&family=LXGW+WenKai+TC:wght@400;700&family=Noto+Serif+TC:wght@700;900&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" rel="stylesheet">
 <meta name="theme-color" content="#372E19">
-<meta name="build" content="3">
+<meta name="build" content="4">
 <meta name="description" content="이름을 고르면 사주·성향·MBTI로 최고/최악 궁합 부적을 점지해 드려요">
 <meta property="og:title" content="廢美部 宮合所 · 폐미부 궁합소">
 <meta property="og:description" content="이름을 고르면 최고/최악 궁합 부적을 점지해 드려요">
