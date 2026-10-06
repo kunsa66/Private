@@ -1,18 +1,18 @@
-<!doctype html>
+﻿<!doctype html>
 <html lang="ko">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>폐미부 궁합소</title>
+<title>?먮?遺 沅곹빀??/title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Hahmlet:wght@500;700;800&family=LXGW+WenKai+TC:wght@400;700&family=Noto+Serif+TC:wght@700;900&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" rel="stylesheet">
 <meta name="theme-color" content="#372E19">
-<meta name="build" content="2">
-<meta name="description" content="이름을 고르면 사주·성향·MBTI로 최고/최악 궁합 부적을 점지해 드려요">
-<meta property="og:title" content="廢美部 宮合所 · 폐미부 궁합소">
-<meta property="og:description" content="이름을 고르면 최고/최악 궁합 부적을 점지해 드려요">
+<meta name="build" content="3">
+<meta name="description" content="?대쫫??怨좊Ⅴ硫??ъ＜쨌?깊뼢쨌MBTI濡?理쒓퀬/理쒖븙 沅곹빀 遺?곸쓣 ?먯????쒕젮??>
+<meta property="og:title" content="兩®풆??若?릦? 쨌 ?먮?遺 沅곹빀??>
+<meta property="og:description" content="?대쫫??怨좊Ⅴ硫?理쒓퀬/理쒖븙 沅곹빀 遺?곸쓣 ?먯????쒕젮??>
 <meta property="og:type" content="website">
 <link rel="stylesheet" href="style.css">
 <style>:root { padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }</style>
@@ -28,51 +28,51 @@
 </header>
 
 <main>
-  <!-- 이름 입력 -->
+  <!-- ?대쫫 ?낅젰 -->
   <section id="s-input" class="screen active">
     <div class="grade-sec">
-      <h3>2학년</h3>
+      <h3>2?숇뀈</h3>
       <div class="roster" id="roster-2"></div>
     </div>
     <div class="grade-sec">
-      <h3>1학년</h3>
+      <h3>1?숇뀈</h3>
       <div class="roster" id="roster-1"></div>
     </div>
     <form id="name-form" class="search" autocomplete="off">
-      <h3><label for="name-input">궁합 볼 이름</label></h3>
+      <h3><label for="name-input">沅곹빀 蹂??대쫫</label></h3>
       <div class="field">
-        <span class="field-seal" aria-hidden="true">名</span>
-        <input id="name-input" placeholder="이름 입력" enterkeyhint="go" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
-        <button class="btn-go" type="submit">점지</button>
+        <span class="field-seal" aria-hidden="true">??/span>
+        <input id="name-input" placeholder="?대쫫 ?낅젰" enterkeyhint="go" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
+        <button class="btn-go" type="submit">?먯?</button>
       </div>
-      <!-- 프로필에 생일이 없는 사람을 골랐을 때만 열림 -->
+      <!-- ?꾨줈?꾩뿉 ?앹씪???녿뒗 ?щ엺??怨⑤옄???뚮쭔 ?대┝ -->
       <div class="bday" id="bday" hidden>
-        <p class="bday-note" id="bday-note">프로필에 생일이 없어요. 생일을 골라주세요</p>
+        <p class="bday-note" id="bday-note">?꾨줈?꾩뿉 ?앹씪???놁뼱?? ?앹씪??怨⑤씪二쇱꽭??/p>
         <div class="bday-row">
-          <div class="seg" id="bday-grade" role="group" aria-label="학년">
-            <button type="button" data-g="2">2학년</button>
-            <button type="button" data-g="1">1학년</button>
+          <div class="seg" id="bday-grade" role="group" aria-label="?숇뀈">
+            <button type="button" data-g="2">2?숇뀈</button>
+            <button type="button" data-g="1">1?숇뀈</button>
           </div>
-          <select id="bday-m" aria-label="월"></select>
-          <select id="bday-d" aria-label="일"></select>
+          <select id="bday-m" aria-label="??></select>
+          <select id="bday-d" aria-label="??></select>
         </div>
       </div>
       <p class="err" id="name-err"></p>
     </form>
-    <p class="bottom-hint">명단에서 누르거나 이름을 입력해 주세요</p>
+    <p class="bottom-hint">紐낅떒?먯꽌 ?꾨Ⅴ嫄곕굹 ?대쫫???낅젰??二쇱꽭??/p>
   </section>
 
-  <!-- 분석 중 -->
+  <!-- 遺꾩꽍 以?-->
   <section id="s-loading" class="screen">
-    <div class="ring"><span>符</span></div>
+    <div class="ring"><span>寧?/span></div>
     <p class="loading-msg" id="loading-msg"></p>
   </section>
 
-  <!-- 결과 -->
+  <!-- 寃곌낵 -->
   <section id="s-result" class="screen">
-    <button class="btn ghost back" data-back>← 다른 이름</button>
+    <button class="btn ghost back" data-back>???ㅻⅨ ?대쫫</button>
     <div id="result"></div>
-    <button class="btn wide" data-back>다음 손님</button>
+    <button class="btn wide" data-back>?ㅼ쓬 ?먮떂</button>
   </section>
 </main>
 

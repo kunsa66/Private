@@ -12,7 +12,7 @@
   --hanja: "LXGW WenKai TC", "Noto Serif TC", serif;
   --title: "Hahmlet", serif;
   --body: "Pretendard Variable", Pretendard, -apple-system, sans-serif;
-  --top-h: 88px;
+  --top-h: 80px;
   color-scheme: dark;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
@@ -39,12 +39,12 @@ p, li { text-wrap: pretty; }
 /* 헤더 */
 .top { display: flex; align-items: center; gap: 14px; justify-content: center; height: var(--top-h); padding: 0 16px; }
 .seal {
-  width: 52px; height: 52px; background: var(--rose); color: var(--surface); border-radius: 8px; transform: rotate(-4deg);
-  display: grid; place-items: center; font-family: "Noto Serif TC", var(--hanja); font-weight: 900; font-size: 28px; line-height: 1; padding-bottom: 4px;
+  width: 42px; height: 42px; background: var(--rose); color: var(--surface); border-radius: 7px; transform: rotate(-4deg);
+  display: grid; place-items: center; font-family: "Noto Serif TC", var(--hanja); font-weight: 900; font-size: 22px; line-height: 1; padding-bottom: 3px;
   box-shadow: inset 0 0 0 3px var(--rose), inset 0 0 0 4.5px var(--surface);
 }
-.brand-title { font-family: "Noto Serif TC", var(--hanja); font-weight: 900; font-size: 30px; letter-spacing: 4px; color: var(--surface); line-height: 1.1; }
-.brand-sub { font-size: 13px; color: var(--pink); letter-spacing: .5px; margin-top: 3px; }
+.brand-title { font-family: "Noto Serif TC", var(--hanja); font-weight: 700; font-size: 23px; letter-spacing: .12em; color: var(--surface); line-height: 1.15; }
+.brand-sub { font-size: 11.5px; font-weight: 400; color: rgba(255,248,236,.55); letter-spacing: 0; margin-top: 4px; }
 
 /* 화면 */
 .screen { display: none; animation: fade .4s ease; }
@@ -69,34 +69,34 @@ p, li { text-wrap: pretty; }
   box-shadow: inset 0 0 0 1px rgba(190,165,171,.22);
 }
 .grade-sec h3 {
-  font-family: var(--title); font-weight: 700; font-size: 13px; color: var(--mustard); letter-spacing: 3px;
+  font-family: var(--body); font-weight: 600; font-size: 12px; color: rgba(255,233,181,.85); letter-spacing: .04em;
   display: flex; align-items: center; gap: 10px; margin: 0 2px 10px;
 }
 .grade-sec h3::after { content: ""; flex: 1; height: 1px; background: rgba(190,165,171,.3); }
 /* 한 줄 반이 보이도록 높이 고정 → 아래에 더 있다는 게 보이고, 박스 안에서만 스크롤 */
 .roster {
-  height: 132px; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
+  max-height: 132px; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain;
   scroll-snap-type: y proximity; margin: 0 -4px; padding: 0 4px;
   mask-image: linear-gradient(180deg, #000 72%, transparent);
   -webkit-mask-image: linear-gradient(180deg, #000 72%, transparent);
 }
-.chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 10px 4px; padding-bottom: 40px; }
+.chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(72px, 1fr)); gap: 10px 4px; padding-bottom: 16px; }
 .chip {
-  display: flex; flex-direction: column; align-items: center; gap: 5px; font-family: var(--body); font-weight: 600; font-size: 13px;
+  display: flex; flex-direction: column; align-items: center; gap: 6px; font-family: var(--body); font-weight: 500; font-size: 12.5px;
   color: var(--surface); background: transparent; border: none; padding: 2px 0; cursor: pointer; scroll-snap-align: start;
 }
 .chip img, .chip .ph { width: 54px; height: 54px; border-radius: 50%; object-fit: cover; background: var(--charcoal-deep); box-shadow: 0 0 0 1.5px rgba(255,248,236,.25); transition: box-shadow .15s, transform .15s; }
 .chip .ph { display: grid; place-items: center; font-family: var(--title); font-weight: 800; color: var(--surface); font-size: 20px; }
 .chip:hover img, .chip:hover .ph, .chip:focus-visible img { box-shadow: 0 0 0 2.5px var(--rose); transform: translateY(-2px); }
-.empty { color: var(--gray); font-size: 13px; padding: 8px 2px; }
-.bottom-hint { text-align: center; font-size: 12px; color: rgba(190,165,171,.7); letter-spacing: .5px; margin-top: 2px; }
+.empty { color: rgba(255,248,236,.4); font-size: 12px; padding: 2px 2px 12px; }
+.bottom-hint { text-align: center; font-size: 11.5px; color: rgba(255,248,236,.38); margin-top: 2px; }
 /* 이름 입력: 학년 박스와 같은 톤, 한 줄 입력 바 */
 .search {
   background: rgba(255,248,236,.04); border-radius: 16px; padding: 12px 12px 8px;
   box-shadow: inset 0 0 0 1px rgba(190,165,171,.22);
 }
 .search h3 {
-  font-family: var(--title); font-weight: 700; font-size: 13px; color: var(--mustard); letter-spacing: 3px;
+  font-family: var(--body); font-weight: 600; font-size: 12px; color: rgba(255,233,181,.85); letter-spacing: .04em;
   display: flex; align-items: center; gap: 10px; margin: 0 2px 10px;
 }
 .search h3::after { content: ""; flex: 1; height: 1px; background: rgba(190,165,171,.3); }
@@ -111,7 +111,7 @@ p, li { text-wrap: pretty; }
   color: var(--surface); background: var(--rose);
 }
 .field input {
-  flex: 1; min-width: 0; font-family: var(--body); font-weight: 600; font-size: 16px; color: var(--text); letter-spacing: 0;
+  flex: 1; min-width: 0; font-family: var(--body); font-weight: 500; font-size: 16px; color: var(--text); letter-spacing: 0;
   padding: 9px 2px; border: none; background: transparent; outline: none; border-radius: 0;
 }
 .field input::placeholder { color: rgba(86,65,71,.4); font-weight: 400; }
@@ -138,11 +138,11 @@ p, li { text-wrap: pretty; }
 .who { display: flex; align-items: center; gap: 18px; }
 .who .avatar { flex: none; width: 92px; height: 92px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 3px var(--surface), 0 0 0 4.5px var(--pink); background: var(--surface-2); }
 .who .meta-top { font-size: 13px; color: var(--gray); }
-.who h2 { font-family: var(--title); font-weight: 800; font-size: 30px; letter-spacing: 2px; margin: 2px 0 4px; color: var(--charcoal-deep); }
+.who h2 { font-family: var(--title); font-weight: 700; font-size: 27px; letter-spacing: .04em; margin: 2px 0 4px; color: var(--charcoal-deep); }
 .who h2 small { font-family: var(--hanja); font-size: 18px; color: var(--gray); font-weight: 400; margin-left: 6px; }
-.who .one { font-size: 15px; line-height: 1.55; color: var(--rose); font-weight: 500; }
+.who .one { font-size: 14px; line-height: 1.6; color: var(--rose); font-weight: 400; }
 
-.section-title { font-family: var(--title); font-weight: 700; font-size: 13px; color: var(--charcoal); letter-spacing: 2px; margin: 30px 0 12px; display: flex; align-items: center; gap: 10px; }
+.section-title { font-family: var(--body); font-weight: 600; font-size: 12px; color: var(--charcoal-deep); letter-spacing: .04em; margin: 30px 0 12px; display: flex; align-items: center; gap: 10px; }
 .section-title::before { content: ""; width: 6px; height: 6px; background: var(--rose); transform: rotate(45deg); }
 .section-title::after { content: ""; flex: 1; height: 1px; background: var(--surface-2); }
 
@@ -170,7 +170,7 @@ p, li { text-wrap: pretty; }
 .match-head { padding: 26px 20px 24px; text-align: center; color: var(--surface); }
 .match.best .match-head { background: var(--rose); }
 .match.worst .match-head { background: var(--charcoal-deep); }
-.match-head .tag { font-family: var(--title); font-weight: 700; font-size: 13px; letter-spacing: 3px; color: var(--surface); opacity: .9; }
+.match-head .tag { font-family: var(--body); font-weight: 500; font-size: 12px; letter-spacing: .06em; color: var(--surface); opacity: .9; }
 .match-head .tag small { font-family: var(--title); font-size: 12px; letter-spacing: 2px; color: var(--surface); opacity: .85; margin-left: 6px; }
 .duo { display: flex; justify-content: center; align-items: center; gap: 14px; margin: 16px 0 10px; }
 .duo img, .duo .ph { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 2.5px var(--surface); background: var(--surface); }
@@ -179,11 +179,11 @@ p, li { text-wrap: pretty; }
 .match-head .vs { font-family: var(--title); font-weight: 800; font-size: 22px; letter-spacing: 1px; }
 .match-head .score { font-family: var(--title); font-weight: 800; font-size: 54px; line-height: 1; margin-top: 10px; }
 .match-head .score small { font-size: 17px; margin-left: 2px; font-weight: 700; }
-.match-head .grade { display: inline-block; margin-top: 12px; background: var(--surface); color: var(--rose); font-family: var(--title); font-weight: 700; font-size: 14px; letter-spacing: 2px; padding: 5px 16px; border-radius: 999px; }
+.match-head .grade { display: inline-block; margin-top: 12px; background: var(--surface); color: var(--rose); font-family: var(--body); font-weight: 600; font-size: 13px; letter-spacing: .02em; padding: 5px 16px; border-radius: 999px; }
 .match.worst .grade { color: var(--charcoal); }
 .match-head .grade .hj { font-family: var(--hanja); font-size: 16px; letter-spacing: 1px; margin-right: 4px; }
 
-.script .say { font-family: var(--title); font-weight: 700; font-size: 20px; line-height: 1.55; text-align: center; padding: 0 6px 18px; border-bottom: 1px dashed var(--surface-2); color: var(--charcoal-deep); }
+.script .say { font-family: var(--title); font-weight: 600; font-size: 18px; line-height: 1.6; text-align: center; padding: 0 6px 18px; border-bottom: 1px dashed var(--surface-2); color: var(--charcoal-deep); }
 .script .partner { font-size: 13px; color: var(--gray); text-align: center; margin: 14px 0 0; line-height: 1.7; }
 .script ul { padding: 0; display: grid; gap: 8px; }
 .script li { list-style: none; font-size: 15px; line-height: 1.7; padding: 12px 14px 12px 54px; position: relative; background: #fff; border-radius: 12px; box-shadow: inset 0 0 0 1px var(--surface-2); }
@@ -211,13 +211,13 @@ p, li { text-wrap: pretty; }
 /* 생일 입력칸 (프로필에 생일이 없는 사람) */
 [hidden] { display: none !important; }
 .bday { margin-top: 10px; }
-.bday-note { font-size: 12px; font-weight: 600; color: var(--pink); margin: 0 2px 8px; }
+.bday-note { font-size: 12px; font-weight: 400; color: rgba(255,248,236,.7); margin: 0 2px 8px; }
 .bday-row { display: flex; gap: 8px; align-items: stretch; }
 .seg { flex: none; display: flex; gap: 2px; padding: 3px; border-radius: 10px; background: rgba(255,248,236,.08); box-shadow: inset 0 0 0 1px rgba(190,165,171,.25); }
-.seg button { font-family: var(--body); font-weight: 600; font-size: 13px; color: var(--surface); background: transparent; border: none; border-radius: 8px; padding: 8px 10px; cursor: pointer; touch-action: manipulation; }
+.seg button { font-family: var(--body); font-weight: 500; font-size: 13px; color: var(--surface); background: transparent; border: none; border-radius: 8px; padding: 8px 10px; cursor: pointer; touch-action: manipulation; }
 .seg button.on { background: var(--surface); color: var(--rose); }
 .bday select {
-  flex: 1; min-width: 0; font-family: var(--body); font-weight: 600; font-size: 16px; color: var(--text);
+  flex: 1; min-width: 0; font-family: var(--body); font-weight: 500; font-size: 16px; color: var(--text);
   background: var(--surface); border: none; border-radius: 10px; padding: 8px 26px 8px 12px; cursor: pointer;
   -webkit-appearance: none; appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23564147' stroke-width='1.6'/%3E%3C/svg%3E");

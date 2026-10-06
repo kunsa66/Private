@@ -80,7 +80,7 @@ $("bday-d").onchange = () => { $("name-err").textContent = ""; };
 function openBday(c) {
   pending = c;
   $("name-input").value = c.name;
-  $("bday-note").textContent = `${c.name}: 프로필에 생일이 없어요. 생일을 골라주세요`;
+  $("bday-note").textContent = `${c.name}의 생일 정보가 없어요. 생일을 골라주세요`;
   $("bday-m").value = "";
   setBdayGrade(c.grade);
   $("bday").hidden = false;
