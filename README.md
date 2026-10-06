@@ -2,7 +2,7 @@
 
 캐릭터 이름을 고르면 사주·성향·MBTI로 최고/최악 궁합을 보여주고 부적 이미지를 만들어주는 사이트.
 
-- 사이트: https://patient-haze-9493.kunsa6667.workers.dev
+- 사이트: https://private.kunsa6667.workers.dev
 - GitHub `main`에 올라오면 Cloudflare가 `public/` 폴더를 자동으로 다시 배포함
 
 ## 파일
