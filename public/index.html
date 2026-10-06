@@ -18,7 +18,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Hahmlet:wght@500;700;800&family=LXGW+WenKai+TC:wght@400;700&family=Noto+Serif+TC:wght@700;900&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" rel="stylesheet">
 <meta name="theme-color" content="#372E19">
-<meta name="build" content="6">
+<meta name="build" content="7">
 <meta name="description" content="이름을 고르면 사주·성향·MBTI로 최고/최악 궁합 부적을 점지해 드려요">
 <meta property="og:title" content="廢美部 宮合所 · 폐미부 궁합소">
 <meta property="og:description" content="이름을 고르면 최고/최악 궁합 부적을 점지해 드려요">
@@ -53,18 +53,6 @@
         <span class="field-seal" aria-hidden="true">名</span>
         <input id="name-input" placeholder="이름 입력" enterkeyhint="go" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
         <button class="btn-go" type="submit">점지</button>
-      </div>
-      <!-- 프로필에 생일이 없는 사람을 골랐을 때만 열림 -->
-      <div class="bday" id="bday" hidden>
-        <p class="bday-note" id="bday-note">프로필에 생일이 없어요. 생일을 골라주세요</p>
-        <div class="bday-row">
-          <div class="seg" id="bday-grade" role="group" aria-label="학년">
-            <button type="button" data-g="2">2학년</button>
-            <button type="button" data-g="1">1학년</button>
-          </div>
-          <select id="bday-m" aria-label="월"></select>
-          <select id="bday-d" aria-label="일"></select>
-        </div>
       </div>
       <p class="err" id="name-err"></p>
     </form>

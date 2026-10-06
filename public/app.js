@@ -3,23 +3,9 @@ const norm = (s) => s.replace(/\s+/g, "").toLowerCase();
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const AGE = { 1: 17, 2: 18 };
 
-/* 현장에서 입력한 생일 (프로필에 생일이 없는 사람). 이 기기에만 저장됨 */
-const BDAY_KEY = "pemibu-bday";
-const BIRTH_YEAR = { 1: 2010, 2: 2009 }; // 2026년 기준 1학년=2010년생, 2학년=2009년생
-let savedBdays = {};
-try { savedBdays = JSON.parse(localStorage.getItem(BDAY_KEY) || "{}"); } catch (e) { savedBdays = {}; }
-
-function applyBirthday(c, birth) {
-  c.birth = birth;
-  c.birthUnknown = false;
-  c.birthNote = "현장 입력";
-  c.pillars = getPillars(birth);
-}
-
-CHARACTERS.forEach((c) => {
-  if (c.birthUnknown && savedBdays[c.id]) applyBirthday(c, savedBdays[c.id]);
-  else c.pillars = getPillars(c.birth);
-});
+// 생일이 없는 사람은 사주를 만들지 않음 (궁합은 성향·MBTI로만)
+CHARACTERS.forEach((c) => (c.pillars = c.birth ? getPillars(c.birth) : null));
+try { localStorage.removeItem("pemibu-bday"); } catch (e) { /* 예전 버전의 생일 입력 기록 정리 */ }
 
 function show(id) {
   document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
@@ -50,78 +36,22 @@ function renderRoster() {
     const list = CHARACTERS.filter((c) => c.grade === g &&
       (!n || norm(c.name).includes(n) || (c.aliases || []).some((a) => norm(a).includes(n))));
     $(`roster-${g}`).innerHTML = list.length
-      ? `<div class="chips">${list.map((c) => `<button type="button" class="chip${c.birthUnknown ? " nobday" : ""}" data-n="${esc(c.name)}"${c.birthUnknown ? ' title="생일 입력 필요"' : ""}>${avatar(c, "")}<span>${esc(c.name)}</span></button>`).join("")}</div>`
+      ? `<div class="chips">${list.map((c) => `<button type="button" class="chip" data-n="${esc(c.name)}">${avatar(c, "")}<span>${esc(c.name)}</span></button>`).join("")}</div>`
       : `<p class="empty">${n ? "해당하는 이름 없음" : "명단 없음"}</p>`;
   }
 }
 renderRoster();
 
-/* 생일 입력칸: 학년 + 월 + 일 */
-let pending = null; // 생일을 기다리는 사람
-let bdayGrade = 2;
-
-$("bday-m").innerHTML = `<option value="">월</option>` + Array.from({ length: 12 }, (_, i) => `<option value="${i + 1}">${i + 1}월</option>`).join("");
-function fillDays() {
-  const m = Number($("bday-m").value);
-  const max = m ? new Date(BIRTH_YEAR[bdayGrade], m, 0).getDate() : 31;
-  const keep = Number($("bday-d").value);
-  $("bday-d").innerHTML = `<option value="">일</option>` + Array.from({ length: max }, (_, i) => `<option value="${i + 1}">${i + 1}일</option>`).join("");
-  if (keep && keep <= max) $("bday-d").value = String(keep);
-}
-function setBdayGrade(g) {
-  bdayGrade = g;
-  document.querySelectorAll("#bday-grade button").forEach((b) => b.classList.toggle("on", Number(b.dataset.g) === g));
-  fillDays();
-}
-$("bday-grade").onclick = (e) => { const b = e.target.closest("button"); if (b) setBdayGrade(Number(b.dataset.g)); };
-$("bday-m").onchange = () => { $("name-err").textContent = ""; fillDays(); };
-$("bday-d").onchange = () => { $("name-err").textContent = ""; };
-
-function openBday(c) {
-  pending = c;
-  $("name-input").value = c.name;
-  $("bday-note").textContent = `${c.name}의 생일 정보가 없어요. 생일을 골라주세요`;
-  $("bday-m").value = "";
-  setBdayGrade(c.grade);
-  $("bday").hidden = false;
-}
-function closeBday() {
-  pending = null;
-  $("bday").hidden = true;
-}
-
-// 고른 사람으로 진행. 생일이 없으면 생일칸부터 열고 멈춤
-function choose(c) {
-  if (!c.birthUnknown) { closeBday(); runLoading(c); return; }
-  if (pending !== c) { openBday(c); renderRoster(); return; }
-  const m = Number($("bday-m").value), d = Number($("bday-d").value);
-  if (!m || !d) { $("name-err").textContent = "생일(월·일)을 골라주세요"; return; }
-  const birth = `${BIRTH_YEAR[bdayGrade]}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-  applyBirthday(c, birth);
-  savedBdays[c.id] = birth;
-  try { localStorage.setItem(BDAY_KEY, JSON.stringify(savedBdays)); } catch (e) { /* 저장 못 해도 이번 결과는 진행 */ }
-  closeBday();
-  renderRoster();
-  runLoading(c);
-}
-
 function goInput() {
   $("name-input").value = "";
   $("name-err").textContent = "";
-  closeBday();
   renderRoster();
   show("s-input");
   focusInput();
 }
 document.querySelectorAll("[data-back]").forEach((b) => (b.onclick = goInput));
 
-$("name-input").oninput = () => {
-  $("name-err").textContent = "";
-  const c = findChar($("name-input").value);
-  if (c && c.birthUnknown) { if (pending !== c) openBday(c); }
-  else if (pending) closeBday();
-  renderRoster();
-};
+$("name-input").oninput = () => { $("name-err").textContent = ""; renderRoster(); };
 
 $("name-form").onsubmit = (e) => {
   e.preventDefault();
@@ -131,13 +61,11 @@ $("name-form").onsubmit = (e) => {
   const hits = CHARACTERS.filter((x) => norm(x.name).includes(n));
   const c = findChar(q) || (hits.length === 1 ? hits[0] : null);
   if (!c) { $("name-err").textContent = "명단에 없는 이름이에요. 아래에서 골라주세요."; return; }
-  choose(c);
+  runLoading(c);
 };
 $("s-input").addEventListener("click", (e) => {
   const chip = e.target.closest(".chip");
-  if (!chip) return;
-  $("name-err").textContent = "";
-  choose(findChar(chip.dataset.n));
+  if (chip) { $("name-input").value = chip.dataset.n; runLoading(findChar(chip.dataset.n)); }
 });
 
 /* 분석 중 연출 */
@@ -168,21 +96,35 @@ function profileLine(c) {
 }
 
 function selfPanel(A) {
-  const p = A.pillars, s = selfReading(A);
-  const max = Math.max(...p.counts, 1);
-  const date = A.birth.replace(/-/g, ".");
-  return `<div class="panel"><div class="panel-in">
-    <div class="who">
+  const p = A.pillars;
+  const head = `<div class="who">
       ${avatar(A, "avatar")}
       <div>
         <div class="meta-top">${profileLine(A)}</div>
         <h2>${esc(A.name)}${A.hanjaName ? `<small>${esc(A.hanjaName)}</small>` : ""}</h2>
         <div class="one">${esc(A.oneLiner)}</div>
       </div>
-    </div>
+    </div>`;
+  const tags = `<li><b>키워드</b><span class="tags">${A.keywords.map((k) => `<span>${esc(k)}</span>`).join("")}</span></li>`;
+
+  // 생일이 없으면 사주 부분을 빼고 안내만
+  if (!p) {
+    return `<div class="panel"><div class="panel-in">${head}
+      <div class="section-title">사주 원국</div>
+      <p class="no-saju">생일 정보가 없어서 사주는 보지 않았어요.<br>궁합은 성향과 MBTI로만 봐요.</p>
+      <div class="meta">${esc(A.mbti)}</div>
+      <div class="section-title">타고난 기운</div>
+      <ul class="self-lines">${tags}</ul>
+    </div></div>`;
+  }
+
+  const s = selfReading(A);
+  const max = Math.max(...p.counts, 1);
+  const date = A.birth.replace(/-/g, ".");
+  return `<div class="panel"><div class="panel-in">${head}
     <div class="section-title">사주 원국</div>
     <div class="pillars">${pillarCell("년주", p.year)}${pillarCell("월주", p.month)}${pillarCell("일주", p.day)}</div>
-    <div class="meta">${date} · ${A.birthUnknown ? `<span class="warn">${esc(A.birthNote)}</span>` : esc(A.birthNote || "")}<br>${p.animal}띠 · ${esc(A.mbti)}</div>
+    <div class="meta">${date} · ${esc(A.birthNote || "")}<br>${p.animal}띠 · ${esc(A.mbti)}</div>
     <div class="section-title">오행 분포</div>
     <div class="el-bars">${p.counts.map((c, e) => `<div class="el-bar">${c}<i style="height:${(c / max) * 64}px;background:${ELEMENT_COLORS[e]}"></i><b>${ELEMENTS_H[e]}<small>${ELEMENTS[e]}</small></b></div>`).join("")}</div>
     <div class="section-title">타고난 기운</div>
@@ -190,7 +132,7 @@ function selfPanel(A) {
       <li><b>일간</b><span>${esc(s.dayMaster)}</span></li>
       <li><b>강한 기운</b><span>${esc(s.strong)}</span></li>
       <li><b>부족 기운</b><span>${s.lack.split(" / ").map(esc).join("<br>")}</span></li>
-      <li><b>키워드</b><span class="tags">${A.keywords.map((k) => `<span>${esc(k)}</span>`).join("")}</span></li>
+      ${tags}
     </ul>
   </div></div>`;
 }
@@ -216,9 +158,9 @@ function matchPanel(kind, A, r) {
     </div>
     <div class="panel-in script">
       <div class="say">"${esc(info.open)}"</div>
-      <div class="partner">${esc(B.name)} · ${profileLine(B)} · ${pillarText(B.pillars.day)}일주 · ${B.pillars.animal}띠 · ${esc(B.mbti)}<br>${esc(B.oneLiner)}</div>
+      <div class="partner">${esc(B.name)} · ${profileLine(B)} · ${B.pillars ? `${pillarText(B.pillars.day)}일주 · ${B.pillars.animal}띠` : "생일 정보 없음"} · ${esc(B.mbti)}<br>${esc(B.oneLiner)}</div>
       <div class="section-title">사주로 보면</div>
-      ${ptList(r.saju.pts)}
+      ${r.saju ? ptList(r.saju.pts) : `<p class="no-saju">${esc(!A.pillars ? A.name : B.name)}의 생일 정보가 없어서 사주는 빼고 봤어요.<br>이 궁합은 성향 70점, MBTI 30점 만점으로 계산했어요.</p>`}
       <div class="section-title">성향으로 보면</div>
       ${ptList(r.traits.pts)}
       <div class="section-title">MBTI ${esc(A.mbti)} × ${esc(B.mbti)}</div>

@@ -259,10 +259,15 @@ function scoreMbti(A, B) {
 }
 
 /* ---------- 종합 ---------- */
+// 둘 다 생일이 있으면 사주 40 + 성향 40 + MBTI 20.
+// 한 명이라도 생일이 없으면 사주를 지어내지 않고 성향 70 + MBTI 30으로 환산.
 function compat(A, B) {
-  const saju = scoreSaju(A, B);
   const traits = scoreTraits(A, B);
   const mbti = scoreMbti(A, B);
+  if (!A.pillars || !B.pillars) {
+    return { partner: B, saju: null, traits, mbti, total: Math.round(traits.score * (70 / 40) + mbti.score * (30 / 20)) };
+  }
+  const saju = scoreSaju(A, B);
   return { partner: B, saju, traits, mbti, total: Math.round(saju.score + traits.score + mbti.score) };
 }
 
@@ -309,7 +314,7 @@ const TIERS = [
 const tierOf = (total) => TIERS.find((t) => total >= t.min);
 
 function shortReason(kind, r) {
-  const all = [...r.saju.pts, ...r.traits.pts, ...r.mbti.pts].filter((p) => p.short);
+  const all = [...(r.saju ? r.saju.pts : []), ...r.traits.pts, ...r.mbti.pts].filter((p) => p.short);
   if (kind === "best") {
     const top = all.filter((p) => p.delta > 0).sort((a, b) => b.delta - a.delta).slice(0, 2);
     return top.length ? top.map((p) => p.short).join(" + ") : "기운이 무난하게 잘 섞이는 조합";

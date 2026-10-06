@@ -3,8 +3,8 @@
    ---------------------------------------------------------
    name      : 입력할 때 쓰는 이름 (공백 무시하고 매칭)
    grade     : 1 또는 2 (학년). 2026년 기준 1학년=2010년생, 2학년=2009년생
-   birth     : "YYYY-MM-DD" 양력
-   birthUnknown : true면 프로필에 생일이 없어서 임시로 넣은 날짜
+   birth     : "YYYY-MM-DD" 양력. 프로필에 생일이 없으면 "" (빈칸)
+               → 그 사람은 사주를 보지 않고, 궁합을 성향 70 + MBTI 30으로 계산
    mbti      : 궁예 MBTI (프로필에 적혀 있으면 그대로)
    traits    : 1~5 점수
                energy  조용함 1 ↔ 5 텐션 MAX
@@ -46,9 +46,8 @@ window.CHARACTERS = [
     id: "jinoh",
     name: "김진오",
     grade: 1, gender: "남",
-    birth: "2010-04-19",
-    birthUnknown: true,
-    birthNote: "생일 미기재 · 임시",
+    birth: "",
+    birthNote: "생일 미기재",
     mbti: "ISTP",
     traits: { energy: 1, warmth: 3, order: 1, serious: 2 },
     values: ["평화", "자유"],
