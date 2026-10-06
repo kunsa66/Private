@@ -184,7 +184,7 @@ function selfPanel(A) {
     <div class="pillars">${pillarCell("년주", p.year)}${pillarCell("월주", p.month)}${pillarCell("일주", p.day)}</div>
     <div class="meta">${date} · ${A.birthUnknown ? `<span class="warn">${esc(A.birthNote)}</span>` : esc(A.birthNote || "")}<br>${p.animal}띠 · ${esc(A.mbti)}</div>
     <div class="section-title">오행 분포</div>
-    <div class="el-bars">${p.counts.map((c, e) => `<div class="el-bar">${c}<i style="height:${(c / max) * 64}px;background:${ELEMENT_COLORS[e]}"></i><b>${ELEMENTS_H[e]} ${ELEMENTS[e]}</b></div>`).join("")}</div>
+    <div class="el-bars">${p.counts.map((c, e) => `<div class="el-bar">${c}<i style="height:${(c / max) * 64}px;background:${ELEMENT_COLORS[e]}"></i><b>${ELEMENTS_H[e]}<small>${ELEMENTS[e]}</small></b></div>`).join("")}</div>
     <div class="section-title">타고난 기운</div>
     <ul class="self-lines">
       <li><b>일간</b><span>${esc(s.dayMaster)}</span></li>

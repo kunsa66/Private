@@ -53,14 +53,14 @@ p, li { text-wrap: pretty; }
 
 /* 버튼 */
 .btn {
-  font-family: var(--title); font-weight: 700; font-size: 16px; letter-spacing: 1.5px; color: var(--surface);
+  font-family: var(--body); font-weight: 600; font-size: 15px; letter-spacing: .02em; color: var(--surface);
   background: var(--rose); border: none; border-radius: 10px; padding: 13px 22px; cursor: pointer; transition: background .15s;
 }
 .btn:hover { background: #E24A80; }
-.btn.ghost { background: transparent; color: var(--surface); box-shadow: inset 0 0 0 1px rgba(250,248,247,.35); font-size: 14px; padding: 9px 16px; }
+.btn.ghost { background: transparent; color: var(--surface); box-shadow: inset 0 0 0 1px rgba(250,248,247,.3); font-size: 13px; font-weight: 500; padding: 8px 14px; }
 .btn.ghost:hover { background: rgba(250,248,247,.08); }
-.btn.wide { display: block; width: 100%; margin-top: 28px; padding: 17px; font-size: 17px; }
-.back { position: sticky; top: calc(8px + env(safe-area-inset-top, 0px)); z-index: 5; margin-bottom: 4px; background: var(--charcoal); }
+.btn.wide { display: block; width: 100%; margin-top: 28px; padding: 16px; font-size: 15px; }
+.back { margin-bottom: 4px; }
 
 /* ── 이름 입력 화면: 위쪽에 세 칸을 쌓고, 아래는 키보드 자리로 비워둠 ── */
 #s-input.active { display: flex; flex-direction: column; gap: 12px; padding-bottom: 24px; }
@@ -137,7 +137,7 @@ p, li { text-wrap: pretty; }
 
 .who { display: flex; align-items: center; gap: 18px; }
 .who .avatar { flex: none; width: 92px; height: 92px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 3px var(--surface), 0 0 0 4.5px var(--pink); background: var(--surface-2); }
-.who .meta-top { font-size: 13px; color: var(--gray); }
+.who .meta-top { font-size: 12.5px; color: var(--gray); }
 .who h2 { font-family: var(--title); font-weight: 700; font-size: 27px; letter-spacing: .04em; margin: 2px 0 4px; color: var(--charcoal-deep); }
 .who h2 small { font-family: var(--hanja); font-size: 18px; color: var(--gray); font-weight: 400; margin-left: 6px; }
 .who .one { font-size: 14px; line-height: 1.6; color: var(--rose); font-weight: 400; }
@@ -148,21 +148,22 @@ p, li { text-wrap: pretty; }
 
 .pillars { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
 .pillar { background: #fff; text-align: center; border-radius: 14px; box-shadow: inset 0 0 0 1px var(--surface-2); padding: 12px 0 14px; }
-.pillar .lbl { font-family: var(--title); font-weight: 500; font-size: 12px; color: var(--gray); letter-spacing: 2px; }
+.pillar .lbl { font-family: var(--body); font-weight: 500; font-size: 12px; color: var(--gray); letter-spacing: 0; }
 .pillar .gz { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
 .pillar .gz span { font-family: var(--hanja); font-weight: 700; font-size: 44px; line-height: 1; }
 .pillar .gz small { display: block; font-family: var(--body); font-weight: 500; font-size: 12px; color: var(--gray); margin-top: 4px; }
-.meta { font-size: 13px; text-align: center; color: var(--gray); margin-top: 12px; line-height: 1.6; }
+.meta { font-size: 12.5px; text-align: center; color: var(--gray); margin-top: 12px; line-height: 1.6; }
 .meta .warn { color: var(--rose); font-weight: 600; }
 
 .el-bars { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; align-items: end; height: 104px; padding: 0 8px; }
-.el-bar { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; font-size: 13px; color: var(--gray); font-weight: 600; }
+.el-bar { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; font-size: 12px; color: var(--gray); font-weight: 500; }
 .el-bar i { display: block; width: 44%; border-radius: 6px 6px 2px 2px; min-height: 3px; margin-top: 4px; }
-.el-bar b { font-family: var(--hanja); font-weight: 700; font-size: 17px; margin-top: 6px; color: var(--charcoal); }
+.el-bar b { font-family: "Noto Serif TC", var(--hanja); font-weight: 700; font-size: 16px; margin-top: 6px; color: var(--charcoal); line-height: 1.2; }
+.el-bar b small { display: block; font-family: var(--body); font-weight: 400; font-size: 11px; color: var(--gray); text-align: center; }
 
 .self-lines { display: grid; gap: 10px; }
-.self-lines li { list-style: none; background: #fff; border-radius: 14px; padding: 14px 16px; box-shadow: inset 0 0 0 1px var(--surface-2); font-size: 15px; line-height: 1.65; }
-.self-lines li b { display: block; font-family: var(--title); font-size: 12px; color: var(--rose); letter-spacing: 1.5px; margin-bottom: 2px; }
+.self-lines li { list-style: none; background: #fff; border-radius: 14px; padding: 14px 16px; box-shadow: inset 0 0 0 1px var(--surface-2); font-size: 14.5px; line-height: 1.65; }
+.self-lines li b { display: block; font-family: var(--body); font-weight: 600; font-size: 12px; color: var(--rose); letter-spacing: 0; margin-bottom: 2px; }
 .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 4px; }
 .tags span { font-size: 13px; font-weight: 500; background: var(--surface-2); color: var(--charcoal); padding: 3px 10px; border-radius: 999px; }
 
@@ -176,9 +177,9 @@ p, li { text-wrap: pretty; }
 .duo img, .duo .ph { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 2.5px var(--surface); background: var(--surface); }
 .duo i { font-style: normal; font-family: "Noto Serif TC", var(--hanja); font-weight: 900; font-size: 22px; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 6px; background: var(--surface); color: var(--rose); box-shadow: inset 0 0 0 4px var(--surface), inset 0 0 0 5.5px var(--rose); }
 .match.worst .duo i { color: var(--charcoal-deep); box-shadow: inset 0 0 0 4px var(--surface), inset 0 0 0 5.5px var(--charcoal-deep); }
-.match-head .vs { font-family: var(--title); font-weight: 800; font-size: 22px; letter-spacing: 1px; }
-.match-head .score { font-family: var(--title); font-weight: 800; font-size: 54px; line-height: 1; margin-top: 10px; }
-.match-head .score small { font-size: 17px; margin-left: 2px; font-weight: 700; }
+.match-head .vs { font-family: var(--title); font-weight: 700; font-size: 19px; letter-spacing: .02em; }
+.match-head .score { font-family: var(--title); font-weight: 700; font-size: 46px; line-height: 1; margin-top: 10px; }
+.match-head .score small { font-size: 15px; margin-left: 2px; font-weight: 600; }
 .match-head .grade { display: inline-block; margin-top: 12px; background: var(--surface); color: var(--rose); font-family: var(--body); font-weight: 600; font-size: 13px; letter-spacing: .02em; padding: 5px 16px; border-radius: 999px; }
 .match.worst .grade { color: var(--charcoal); }
 .match-head .grade .hj { font-family: var(--hanja); font-size: 16px; letter-spacing: 1px; margin-right: 4px; }
@@ -186,12 +187,12 @@ p, li { text-wrap: pretty; }
 .script .say { font-family: var(--title); font-weight: 600; font-size: 18px; line-height: 1.6; text-align: center; padding: 0 6px 18px; border-bottom: 1px dashed var(--surface-2); color: var(--charcoal-deep); }
 .script .partner { font-size: 13px; color: var(--gray); text-align: center; margin: 14px 0 0; line-height: 1.7; }
 .script ul { padding: 0; display: grid; gap: 8px; }
-.script li { list-style: none; font-size: 15px; line-height: 1.7; padding: 12px 14px 12px 54px; position: relative; background: #fff; border-radius: 12px; box-shadow: inset 0 0 0 1px var(--surface-2); }
+.script li { list-style: none; font-size: 14.5px; line-height: 1.7; padding: 12px 14px 12px 54px; position: relative; background: #fff; border-radius: 12px; box-shadow: inset 0 0 0 1px var(--surface-2); }
 .script li::before { content: attr(data-d); position: absolute; left: 12px; top: 14px; font-family: var(--body); font-size: 11px; font-weight: 700; width: 32px; text-align: center; border-radius: 999px; padding: 2px 0; }
 .script li.plus::before { background: var(--rose); color: #fff; }
 .script li.minus::before { background: var(--charcoal); color: #fff; }
 .script li.zero::before { content: "·"; color: var(--gray); font-size: 18px; top: 9px; }
-.script .close { margin-top: 22px; padding: 16px 18px; text-align: center; font-family: var(--title); font-weight: 700; font-size: 16px; line-height: 1.6; color: var(--rose); background: #FFE8F1; border-radius: 14px; }
+.script .close { margin-top: 22px; padding: 16px 18px; text-align: center; font-family: var(--title); font-weight: 600; font-size: 15px; line-height: 1.6; color: var(--rose); background: #FFE8F1; border-radius: 14px; }
 .match.worst .script .close { color: var(--charcoal); background: var(--surface-2); }
 
 .card-wrap { margin-top: 24px; text-align: center; }
