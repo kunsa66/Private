@@ -16,7 +16,16 @@ const stemEl = (s) => Math.floor(s / 2);
 // 절기 시작일 (근사값) → 월지
 const JEOL = [[1, 6, 1], [2, 4, 2], [3, 6, 3], [4, 5, 4], [5, 6, 5], [6, 6, 6], [7, 7, 7], [8, 8, 8], [9, 8, 9], [10, 8, 10], [11, 7, 11], [12, 7, 0]];
 
-function getPillars(birth) {
+// 태어난 시 (12시진). 한국 표준시 기준이라 30분씩 밀린 구간을 씀
+const HOUR_SLOTS = [
+  ["자시", "23:30~01:29"], ["축시", "01:30~03:29"], ["인시", "03:30~05:29"], ["묘시", "05:30~07:29"],
+  ["진시", "07:30~09:29"], ["사시", "09:30~11:29"], ["오시", "11:30~13:29"], ["미시", "13:30~15:29"],
+  ["신시", "15:30~17:29"], ["유시", "17:30~19:29"], ["술시", "19:30~21:29"], ["해시", "21:30~23:29"],
+];
+const hourIndex = (name) => HOUR_SLOTS.findIndex(([n]) => n === name);
+
+// hour: "인시" 같은 시진 이름 (없으면 시주 없이 6글자)
+function getPillars(birth, hour) {
   const [y, m, d] = birth.split("-").map(Number);
   const sy = m < 2 || (m === 2 && d < 4) ? y - 1 : y; // 입춘 전이면 전년도
   const yi = (((sy - 4) % 60) + 60) % 60;
@@ -31,8 +40,14 @@ function getPillars(birth) {
     month: { s: ms, b: mb },
     day: { s: di % 10, b: di % 12 },
   };
+  const hb = hour ? hourIndex(hour) : -1;
+  if (hb >= 0) {
+    // 시간(時干): 일간에 따라 자시의 천간이 정해짐 (갑·기일 → 갑자시 …)
+    p.hour = { s: (((p.day.s % 5) * 2) + hb) % 10, b: hb };
+  }
   const counts = [0, 0, 0, 0, 0];
-  for (const key of ["year", "month", "day"]) {
+  for (const key of ["year", "month", "day", "hour"]) {
+    if (!p[key]) continue;
     counts[stemEl(p[key].s)]++;
     counts[BRANCH_EL[p[key].b]]++;
   }

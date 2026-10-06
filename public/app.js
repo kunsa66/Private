@@ -3,36 +3,46 @@ const norm = (s) => s.replace(/\s+/g, "").toLowerCase();
 const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const AGE = { 1: 17, 2: 18 };
 
-// 생일이 없는 사람은 사주를 만들지 않음 (궁합은 성향·MBTI로만)
-CHARACTERS.forEach((c) => (c.pillars = c.birth ? getPillars(c.birth) : null));
+// 생일이 없는 사람은 사주를 만들지 않음 (궁합은 성향·MBTI로만). 시간이 있으면 시주까지
+const refreshPillars = (c) => (c.pillars = c.birth ? getPillars(c.birth, c.hour) : null);
+CHARACTERS.forEach(refreshPillars);
 try { localStorage.removeItem("pemibu-bday"); } catch (e) { /* 예전 버전의 생일 입력 기록 정리 */ }
 
-/* 친구들이 입력한 생일: 서버(/api/birthdays)에 모아서 모두에게 공유.
-   data.js에 생일이 있으면 항상 그게 우선. */
+/* 친구들이 입력한 생일·태어난 시: 서버에 모아서 모두에게 공유.
+   data.js에 적힌 값이 있으면 항상 그게 우선. 처음 입력된 값만 저장됨. */
 const BIRTH_YEAR = { 1: 2010, 2: 2009 }; // 2026년 기준 1학년=2010년생, 2학년=2009년생
-const API = "/api/birthdays";
+const SHARED = {
+  birth: { api: "/api/birthdays", note: "birthNote" },
+  hour: { api: "/api/hours", note: "hourNote" },
+};
 
-function applySharedBirthday(c, birth) {
-  if (c.birth || !birth) return;
-  c.birth = birth;
-  c.birthNote = "친구가 입력";
-  c.pillars = getPillars(birth);
+function applyShared(c, field, value) {
+  if (c[field] || !value) return;
+  c[field] = value;
+  c[SHARED[field].note] = "친구가 입력";
+  refreshPillars(c);
 }
 
-fetch(API, { cache: "no-store" })
-  .then((r) => (r.ok ? r.json() : {}))
-  .then((map) => CHARACTERS.forEach((c) => applySharedBirthday(c, map[c.id])))
-  .catch(() => { /* 내 PC 미리보기(서버실행.bat)에는 저장소가 없음 → 그냥 넘어감 */ });
+for (const field of Object.keys(SHARED)) {
+  fetch(SHARED[field].api, { cache: "no-store" })
+    .then((r) => (r.ok ? r.json() : {}))
+    .then((map) => CHARACTERS.forEach((c) => applyShared(c, field, map[c.id])))
+    .catch(() => { /* 내 PC 미리보기(서버실행.bat)에는 저장소가 없음 → 그냥 넘어감 */ });
+}
 
-async function saveSharedBirthday(c, birth) {
-  applySharedBirthday(c, birth);
+async function saveShared(c, field, value) {
+  applyShared(c, field, value);
   try {
-    const r = await fetch(API, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: c.id, birth }) });
+    const r = await fetch(SHARED[field].api, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: c.id, [field]: value }) });
     const res = await r.json();
-    // 다른 친구가 먼저 입력해 둔 생일이 있으면 그걸 따름
-    if (res.birth && res.birth !== c.birth) { c.birth = ""; applySharedBirthday(c, res.birth); }
-  } catch (e) { /* 저장 실패해도 이번 결과는 입력한 생일로 진행 */ }
+    // 다른 친구가 먼저 입력해 둔 값이 있으면 그걸 따름
+    if (res[field] && res[field] !== c[field]) { c[field] = ""; applyShared(c, field, res[field]); }
+  } catch (e) { /* 저장 실패해도 이번 결과는 입력한 값으로 진행 */ }
 }
+
+const hourOptions = (placeholder) =>
+  `<option value="">${placeholder}</option>` + HOUR_SLOTS.map(([n, t]) => `<option value="${n}">${n} (${t})</option>`).join("");
+const hourLabel = (name) => { const s = HOUR_SLOTS[hourIndex(name)]; return s ? `${s[0]} ${s[1]}` : ""; };
 
 function show(id) {
   document.querySelectorAll(".screen").forEach((s) => s.classList.remove("active"));
@@ -88,12 +98,14 @@ function setBdayGrade(g) {
 }
 $("bday-grade").onclick = (e) => { const b = e.target.closest("button"); if (b) setBdayGrade(Number(b.dataset.g)); };
 $("bday-m").onchange = fillDays;
+$("bday-h").innerHTML = hourOptions("태어난 시 (모르면 비워두기)");
 
 function openBday(c) {
   pending = c;
   $("name-input").value = c.name;
   $("bday-note").textContent = `${c.name}의 생일 정보가 없어요. 알면 골라주세요. 입력하면 모두의 궁합에 사주가 반영돼요. 모르면 그냥 점지를 누르세요.`;
   $("bday-m").value = "";
+  $("bday-h").value = "";
   setBdayGrade(c.grade);
   $("bday").hidden = false;
 }
@@ -106,13 +118,13 @@ function closeBday() {
 function choose(c) {
   if (c.birth) { closeBday(); runLoading(c); return; }
   if (pending !== c) { openBday(c); return; }
-  const m = Number($("bday-m").value), d = Number($("bday-d").value);
+  const m = Number($("bday-m").value), d = Number($("bday-d").value), h = $("bday-h").value;
   closeBday();
   if (m && d) {
     const birth = `${BIRTH_YEAR[bdayGrade]}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
-    saveSharedBirthday(c, birth).then(() => runLoading(c));
+    Promise.all([saveShared(c, "birth", birth), h ? saveShared(c, "hour", h) : null]).then(() => runLoading(c));
   } else {
-    runLoading(c);
+    runLoading(c); // 생일 없이 시간만으로는 시주를 못 세움
   }
 }
 
@@ -204,10 +216,19 @@ function selfPanel(A) {
   const s = selfReading(A);
   const max = Math.max(...p.counts, 1);
   const date = A.birth.replace(/-/g, ".");
+  // 시간을 알면 시주까지 8글자, 모르면 결과 화면에서 바로 추가할 수 있게
+  const hourInfo = p.hour
+    ? `<br>태어난 시 ${esc(hourLabel(A.hour))}${A.hourNote ? ` · ${esc(A.hourNote)}` : ""}`
+    : "";
+  const addHour = p.hour ? "" : `<div class="hour-add">
+      <label for="hour-add">태어난 시간을 알면 시주까지 볼 수 있어요</label>
+      <select id="hour-add" data-id="${esc(A.id)}">${hourOptions("태어난 시 고르기")}</select>
+    </div>`;
   return `<div class="panel"><div class="panel-in">${head}
     <div class="section-title">사주 원국</div>
-    <div class="pillars">${pillarCell("년주", p.year)}${pillarCell("월주", p.month)}${pillarCell("일주", p.day)}</div>
-    <div class="meta">${date} · ${esc(A.birthNote || "")}<br>${p.animal}띠 · ${esc(A.mbti)}</div>
+    <div class="pillars${p.hour ? " four" : ""}">${pillarCell("년주", p.year)}${pillarCell("월주", p.month)}${pillarCell("일주", p.day)}${p.hour ? pillarCell("시주", p.hour) : ""}</div>
+    <div class="meta">${date} · ${esc(A.birthNote || "")}${hourInfo}<br>${p.animal}띠 · ${esc(A.mbti)}</div>
+    ${addHour}
     <div class="section-title">오행 분포</div>
     <div class="el-bars">${p.counts.map((c, e) => `<div class="el-bar">${c}<i style="height:${(c / max) * 64}px;background:${ELEMENT_COLORS[e]}"></i><b>${ELEMENTS_H[e]}<small>${ELEMENTS[e]}</small></b></div>`).join("")}</div>
     <div class="section-title">타고난 기운</div>
@@ -276,6 +297,19 @@ async function renderCard(kind, A, r, token) {
 }
 
 const IN_FRAME = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
+
+// 결과 화면에서 태어난 시를 고르면: 저장 → 사주 다시 계산 → 결과 다시 그림 (스크롤 위치 유지)
+$("result").addEventListener("change", (e) => {
+  if (e.target.id !== "hour-add" || !e.target.value) return;
+  const A = CHARACTERS.find((c) => c.id === e.target.dataset.id);
+  if (!A) return;
+  const y = window.scrollY;
+  e.target.disabled = true;
+  saveShared(A, "hour", e.target.value).then(() => {
+    renderResult(A, findMatches(A, CHARACTERS));
+    window.scrollTo(0, y);
+  });
+});
 
 function renderResult(A, res) {
   $("result").innerHTML = selfPanel(A) + matchPanel("best", A, res.best) + matchPanel("worst", A, res.worst);
