@@ -340,8 +340,9 @@ function compat(A, B) {
   return { partner: B, saju, traits, mbti, total: Math.round(saju.score + traits.score + mbti.score) };
 }
 
+// 활동 없는 사람(inactive)은 본인 궁합은 볼 수 있지만, 다른 사람의 상대 후보로는 안 나옴
 function findMatches(A, list) {
-  const results = list.filter((c) => c.id !== A.id).map((B) => compat(A, B));
+  const results = list.filter((c) => c.id !== A.id && !c.inactive).map((B) => compat(A, B));
   results.sort((x, y) => y.total - x.total || x.partner.id.localeCompare(y.partner.id));
   return { best: results[0], worst: results[results.length - 1], all: results };
 }
