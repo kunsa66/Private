@@ -18,7 +18,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Hahmlet:wght@500;700;800&family=LXGW+WenKai+TC:wght@400;700&family=Noto+Serif+TC:wght@700;900&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" rel="stylesheet">
 <meta name="theme-color" content="#372E19">
-<meta name="build" content="15">
+<meta name="build" content="16">
 <meta name="description" content="이름을 고르면 사주·성향·MBTI로 최고/최악 궁합 부적을 점지해 드려요">
 <meta property="og:title" content="廢美部 宮合所 · 폐미부 궁합소">
 <meta property="og:description" content="이름을 고르면 최고/최악 궁합 부적을 점지해 드려요">
@@ -48,9 +48,7 @@
       <div class="roster" id="roster-1"></div>
     </div>
     <form id="name-form" class="search" autocomplete="off">
-      <h3><label for="name-input" id="name-label">궁합 볼 사람</label></h3>
-      <!-- 명단 터치나 이름 입력으로 최대 두 명: 한 명이면 최고·최악, 두 명이면 둘의 궁합 -->
-      <div class="pair-slots" id="pair-slots"></div>
+      <h3><label for="name-input" id="name-label">궁합 볼 이름</label></h3>
       <div class="field">
         <span class="field-seal" aria-hidden="true">名</span>
         <input id="name-input" placeholder="이름으로 찾기" enterkeyhint="go" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
@@ -71,7 +69,12 @@
       </div>
       <p class="err" id="name-err"></p>
     </form>
-    <p class="bottom-hint" id="go-hint">한 명: 최고·최악 상대 찾기 · 두 명: 둘의 궁합</p>
+    <!-- 2인 궁합: 칸을 누르고 명단(또는 이름 입력)에서 고르면, 두 칸이 차는 순간 바로 궁합 -->
+    <div class="search pair-box">
+      <h3>2인 궁합</h3>
+      <div class="pair-slots" id="pair-slots"></div>
+    </div>
+    <p class="bottom-hint" id="go-hint">명단에서 누르면 그 사람의 최고·최악 상대가 바로 나와요</p>
   </section>
 
   <!-- 분석 중 -->

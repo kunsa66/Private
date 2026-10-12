@@ -77,43 +77,50 @@ function avatar(c, cls) {
     ? `<img class="${cls}" src="${esc(c.photo)}" alt="">`
     : `<span class="${cls} ph">${esc(c.name.slice(-1))}</span>`;
 }
-/* 사람 고르기: 명단 터치 또는 이름 입력으로 최대 두 명.
-   점지 → 한 명이면 최고·최악 상대, 두 명이면 그 둘의 궁합 */
-let pairSel = [];
+/* 고르기
+   - 평소: 명단 터치 / 이름 입력 후 엔터 → 그 사람의 최고·최악 결과로 바로
+   - 2인 궁합: 칸을 누르면 '고르는 중'이 되고, 명단 터치·이름 입력이 그 칸으로 들어감.
+     두 칸이 다 차는 순간 바로 둘의 궁합 */
+let pairSel = [null, null];
+let pickSlot = null; // 지금 채우는 중인 2인 궁합 칸 (0 / 1 / null)
 
 function renderSlots() {
-  const slot = (c, i) => c
-    ? `<button type="button" class="slot filled" data-slot="${i}">${avatar(c, "")}<span>${esc(c.name)}</span><b aria-label="빼기">×</b></button>`
-    : `<span class="slot">${i === 0 ? "궁합 볼 사람" : "상대 (선택)"}</span>`;
-  $("pair-slots").innerHTML = `${slot(pairSel[0], 0)}<i>${pairSel.length === 2 ? "緣" : "♡"}</i>${slot(pairSel[1], 1)}`;
-  $("go-hint").textContent = pairSel.length === 2
-    ? `${pairSel[0].name} × ${pairSel[1].name}, 둘의 궁합을 봐요`
-    : pairSel.length === 1 ? `${pairSel[0].name}의 최고·최악 상대를 찾아요. 상대를 한 명 더 고르면 둘의 궁합` : "한 명: 최고·최악 상대 찾기 · 두 명: 둘의 궁합";
+  const slot = (c, i) => {
+    const active = pickSlot === i ? " active" : "";
+    return c
+      ? `<button type="button" class="slot filled${active}" data-slot="${i}">${avatar(c, "")}<span>${esc(c.name)}</span><b aria-label="빼기">×</b></button>`
+      : `<button type="button" class="slot${active}" data-slot="${i}">${pickSlot === i ? "명단에서 고르기" : i === 0 ? "+ 첫 번째" : "+ 두 번째"}</button>`;
+  };
+  $("pair-slots").innerHTML = `${slot(pairSel[0], 0)}<i>${pairSel[0] && pairSel[1] ? "緣" : "♡"}</i>${slot(pairSel[1], 1)}`;
+  $("go-hint").textContent = pickSlot !== null
+    ? `2인 궁합 ${pickSlot + 1}번째 사람을 명단에서 누르거나 이름을 입력해 주세요`
+    : "명단에서 누르면 그 사람의 최고·최악 상대가 바로 나와요";
+  document.body.classList.toggle("picking", pickSlot !== null);
 }
+
+// 칸 누르기: 빈 칸 → 고르는 중으로 / 고르는 중인 칸 → 취소 / 찬 칸 → 비우고 다시 고르기
 $("pair-slots").onclick = (e) => {
-  const s = e.target.closest(".slot.filled");
+  const s = e.target.closest(".slot");
   if (!s) return;
-  pairSel.splice(Number(s.dataset.slot), 1);
-  afterSelect();
-};
-
-// 고르기 (이미 고른 사람은 다시 누르면 빠짐, 두 명이 차 있으면 두 번째 자리를 바꿈)
-function togglePick(c) {
-  const i = pairSel.indexOf(c);
-  if (i >= 0) pairSel.splice(i, 1);
-  else if (pairSel.length < 2) pairSel.push(c);
-  else pairSel[1] = c;
-  $("name-input").value = "";
-  afterSelect();
-}
-
-// 한 명만 골랐고 그 사람 생일이 없으면 생일칸(선택 입력)을 열어둠
-function afterSelect() {
-  $("name-err").textContent = "";
-  if (pairSel.length === 1 && !pairSel[0].birth) { if (pending !== pairSel[0]) openBday(pairSel[0]); }
-  else closeBday();
+  const i = Number(s.dataset.slot);
+  closeBday();
+  if (pairSel[i]) { pairSel[i] = null; pickSlot = i; }
+  else pickSlot = pickSlot === i ? null : i;
   renderSlots();
   renderRoster();
+};
+
+// 2인 궁합 칸에 넣기. 다른 칸이 비었으면 그 칸으로 넘어가고, 둘 다 차면 바로 궁합
+function fillSlot(c) {
+  const other = 1 - pickSlot;
+  if (pairSel[other] === c) { $("name-err").textContent = "같은 사람은 두 번 고를 수 없어요."; return; }
+  pairSel[pickSlot] = c;
+  pickSlot = pairSel[other] ? null : other;
+  $("name-input").value = "";
+  $("name-err").textContent = "";
+  renderSlots();
+  renderRoster();
+  if (pairSel[0] && pairSel[1]) runPair();
 }
 
 function runPair() {
@@ -135,12 +142,12 @@ function renderRoster() {
     const list = CHARACTERS.filter((c) => c.grade === g &&
       (!n || norm(c.name).includes(n) || (c.aliases || []).some((a) => norm(a).includes(n))));
     $(`roster-${g}`).innerHTML = list.length
-      ? `<div class="chips">${list.map((c) => `<button type="button" class="chip${pairSel.includes(c) ? " sel" : ""}" data-n="${esc(c.name)}">${avatar(c, "")}<span>${esc(c.name)}</span></button>`).join("")}</div>`
+      ? `<div class="chips">${list.map((c) => `<button type="button" class="chip${pairSel.includes(c) || pending === c ? " sel" : ""}" data-n="${esc(c.name)}">${avatar(c, "")}<span>${esc(c.name)}</span></button>`).join("")}</div>`
       : `<p class="empty">${n ? "해당하는 이름 없음" : "명단 없음"}</p>`;
   }
 }
 
-/* 생일칸 (생일 정보가 없는 사람 한 명을 골랐을 때만, 선택 입력) */
+/* 생일칸: 생일 정보가 없는 사람을 (2인 궁합이 아닐 때) 고르면 열림. 입력은 선택, 점지로 진행 */
 let pending = null;
 let bdayGrade = 2;
 
@@ -168,6 +175,8 @@ function openBday(c) {
   $("bday-h").value = "";
   setBdayGrade(c.grade);
   $("bday").hidden = false;
+  $("go-hint").textContent = `${c.name} 생일을 고르고 점지를 누르세요 (몰라도 점지)`;
+  renderRoster();
 }
 function closeBday() {
   pending = null;
@@ -187,10 +196,22 @@ function runSingle(c) {
   }
 }
 
+// 한 명 고르기: 생일 있으면 바로 결과, 없으면 생일칸부터 (같은 사람을 한 번 더 누르면 진행)
+function pickOne(c) {
+  $("name-input").value = "";
+  $("name-err").textContent = "";
+  if (c.birth || pending === c) runSingle(c);
+  else openBday(c);
+}
+
 function goInput() {
   $("name-input").value = "";
-  pairSel = [];
-  afterSelect();
+  $("name-err").textContent = "";
+  pairSel = [null, null];
+  pickSlot = null;
+  closeBday();
+  renderSlots();
+  renderRoster();
   show("s-input");
   focusInput();
 }
@@ -198,31 +219,32 @@ document.querySelectorAll("[data-back]").forEach((b) => (b.onclick = goInput));
 
 $("name-input").oninput = () => { $("name-err").textContent = ""; renderRoster(); };
 
-// 점지(엔터): 칸에 이름이 쳐져 있으면 먼저 고르기에 추가, 비어 있으면 고른 사람으로 진행
 $("name-form").onsubmit = (e) => {
   e.preventDefault();
   const q = $("name-input").value.trim();
-  if (q) {
-    const n = norm(q);
-    const hits = CHARACTERS.filter((x) => norm(x.name).includes(n));
-    const c = findChar(q) || (hits.length === 1 ? hits[0] : null);
-    if (!c) { $("name-err").textContent = "명단에 없는 이름이에요. 아래에서 골라주세요."; return; }
-    // 이름을 쳐서 엔터 → 고르기에만 추가 (한 명 더 칠 수 있게). 진행은 점지를 한 번 더
-    if (!pairSel.includes(c)) togglePick(c);
-    else { $("name-input").value = ""; renderRoster(); }
+  if (!q) {
+    if (pending) runSingle(pending);
+    else $("name-err").textContent = "명단에서 고르거나 이름을 입력해 주세요.";
     return;
   }
-  if (!pairSel.length) { $("name-err").textContent = "명단에서 고르거나 이름을 입력해 주세요."; return; }
-  if (pairSel.length === 2) runPair();
-  else runSingle(pairSel[0]);
+  const n = norm(q);
+  const hits = CHARACTERS.filter((x) => norm(x.name).includes(n));
+  const c = findChar(q) || (hits.length === 1 ? hits[0] : null);
+  if (!c) { $("name-err").textContent = "명단에 없는 이름이에요. 아래에서 골라주세요."; return; }
+  if (pickSlot !== null) fillSlot(c);
+  else pickOne(c);
 };
 $("s-input").addEventListener("click", (e) => {
   const chip = e.target.closest(".chip");
-  if (chip) togglePick(findChar(chip.dataset.n));
+  if (!chip) return;
+  const c = findChar(chip.dataset.n);
+  if (pickSlot !== null) fillSlot(c);
+  else pickOne(c);
 });
 
 renderSlots();
 renderRoster();
+
 /* 분석 중 연출 */
 const LOADING_MSGS = ["사주팔자를 펼치는 중", "오행의 흐름을 읽는 중", "인연의 실을 따라가는 중", "궁합 부적을 쓰는 중"];
 function runLoading(c) {

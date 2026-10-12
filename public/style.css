@@ -247,9 +247,6 @@ p, li { text-wrap: pretty; }
 @media (max-width: 420px) { .pillars.four .pillar .gz span { font-size: 30px; } }
 
 /* 모드 전환: 최고·최악 찾기 / 둘이 궁합 */
-.mode { display: grid; grid-template-columns: 1fr 1fr; gap: 3px; padding: 3px; margin-bottom: 12px; border-radius: 11px; background: rgba(255,248,236,.07); box-shadow: inset 0 0 0 1px rgba(190,165,171,.22); }
-.mode button { font-family: var(--body); font-weight: 600; font-size: 13px; color: rgba(255,248,236,.7); background: transparent; border: none; border-radius: 8px; padding: 9px 0; cursor: pointer; touch-action: manipulation; }
-.mode button.on { background: var(--surface); color: var(--rose); }
 
 /* 둘이 궁합: 고른 두 사람 */
 .pair-slots { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; margin-bottom: 10px; }
@@ -283,3 +280,10 @@ p, li { text-wrap: pretty; }
 }
 .edit-grid .btn-go { margin-top: 6px; padding: 12px; }
 .edit-note { font-size: 11.5px; color: var(--gray); text-align: center; }
+/* 2인 궁합 칸 (따로 뺀 상자) */
+.pair-box { margin-top: 12px; padding-bottom: 12px; }
+.pair-box .pair-slots { margin-bottom: 0; }
+.slot { cursor: pointer; touch-action: manipulation; }
+.slot.active { border: 1.5px solid var(--pink); color: var(--pink); background: rgba(243,90,145,.08); }
+.slot.filled.active { box-shadow: inset 0 0 0 1.5px var(--pink); }
+body.picking .chip { box-shadow: inset 0 0 0 1px rgba(243,90,145,.35); }
