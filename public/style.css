@@ -10,7 +10,7 @@
   --surface-2: #F2E6D8;
   --text: #372E19;
   --hanja: "LXGW WenKai TC", "Noto Serif TC", serif;
-  --title: "Noto Serif KR", serif;
+  --title: "Hahmlet", serif;
   --body: "Pretendard Variable", Pretendard, -apple-system, sans-serif;
   --top-h: 80px;
   color-scheme: dark;
@@ -87,7 +87,7 @@ p, li { text-wrap: pretty; }
   color: var(--surface); background: transparent; border: none; padding: 2px 0; cursor: pointer; scroll-snap-align: start;
 }
 .chip img, .chip .ph { width: 54px; height: 54px; border-radius: 50%; object-fit: cover; background: var(--charcoal-deep); box-shadow: 0 0 0 1.5px rgba(255,248,236,.25); transition: box-shadow .15s, transform .15s; }
-.chip .ph { display: grid; place-items: center; font-family: var(--title); font-weight: 600; color: var(--surface); font-size: 20px; }
+.chip .ph { display: grid; place-items: center; font-family: var(--title); font-weight: 800; color: var(--surface); font-size: 20px; }
 .chip:hover img, .chip:hover .ph, .chip:focus-visible img { box-shadow: 0 0 0 2.5px var(--rose); transform: translateY(-2px); }
 .empty { color: rgba(255,248,236,.4); font-size: 12px; padding: 2px 2px 12px; }
 .bottom-hint { text-align: center; font-size: 11.5px; color: rgba(255,248,236,.38); margin-top: 2px; }
@@ -130,7 +130,7 @@ p, li { text-wrap: pretty; }
 .ring::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; border-top: 2px solid var(--rose); animation: spin 1.1s linear infinite; }
 .ring span { font-family: var(--hanja); font-weight: 700; font-size: 60px; color: var(--mustard); }
 @keyframes spin { to { transform: rotate(360deg); } }
-.loading-msg { font-family: var(--title); font-weight: 500; font-size: 16px; letter-spacing: .06em; color: var(--surface); margin-top: 30px; min-height: 28px; }
+.loading-msg { font-family: var(--title); font-weight: 500; font-size: 17px; letter-spacing: 2px; color: var(--surface); margin-top: 30px; min-height: 28px; }
 
 /* 결과 패널 */
 .panel { background: var(--surface); color: var(--text); border-radius: 22px; margin-top: 22px; overflow: hidden; }
@@ -139,7 +139,7 @@ p, li { text-wrap: pretty; }
 .who { display: flex; align-items: center; gap: 18px; }
 .who .avatar { flex: none; width: 92px; height: 92px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 3px var(--surface), 0 0 0 4.5px var(--pink); background: var(--surface-2); }
 .who .meta-top { font-size: 12.5px; color: var(--gray); }
-.who h2 { font-family: var(--title); font-weight: 700; font-size: 27px; letter-spacing: -0.01em; margin: 2px 0 4px; color: var(--charcoal-deep); }
+.who h2 { font-family: var(--title); font-weight: 700; font-size: 27px; letter-spacing: .04em; margin: 2px 0 4px; color: var(--charcoal-deep); }
 .who h2 small { font-family: var(--hanja); font-size: 18px; color: var(--gray); font-weight: 400; margin-left: 6px; }
 .who .one { font-size: 14px; line-height: 1.6; color: var(--rose); font-weight: 400; }
 
@@ -173,19 +173,19 @@ p, li { text-wrap: pretty; }
 .match.best .match-head { background: var(--rose); }
 .match.worst .match-head { background: var(--charcoal-deep); }
 .match-head .tag { font-family: var(--body); font-weight: 500; font-size: 12px; letter-spacing: .06em; color: var(--surface); opacity: .9; }
-.match-head .tag small { font-family: var(--title); font-size: 12px; letter-spacing: .08em; color: var(--surface); opacity: .85; margin-left: 6px; }
+.match-head .tag small { font-family: var(--title); font-size: 12px; letter-spacing: 2px; color: var(--surface); opacity: .85; margin-left: 6px; }
 .duo { display: flex; justify-content: center; align-items: center; gap: 14px; margin: 16px 0 10px; }
 .duo img, .duo .ph { width: 72px; height: 72px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 2.5px var(--surface); background: var(--surface); }
 .duo i { font-style: normal; font-family: "Noto Serif TC", var(--hanja); font-weight: 900; font-size: 22px; width: 40px; height: 40px; display: grid; place-items: center; border-radius: 6px; background: var(--surface); color: var(--rose); box-shadow: inset 0 0 0 4px var(--surface), inset 0 0 0 5.5px var(--rose); }
 .match.worst .duo i { color: var(--charcoal-deep); box-shadow: inset 0 0 0 4px var(--surface), inset 0 0 0 5.5px var(--charcoal-deep); }
-.match-head .vs { font-family: var(--title); font-weight: 600; font-size: 19px; letter-spacing: -0.01em; }
-.match-head .score { font-family: var(--title); font-weight: 600; font-size: 46px; letter-spacing: -0.02em; line-height: 1; margin-top: 10px; }
+.match-head .vs { font-family: var(--title); font-weight: 700; font-size: 19px; letter-spacing: .02em; }
+.match-head .score { font-family: var(--title); font-weight: 700; font-size: 46px; line-height: 1; margin-top: 10px; }
 .match-head .score small { font-size: 15px; margin-left: 2px; font-weight: 600; }
 .match-head .grade { display: inline-block; margin-top: 12px; background: var(--surface); color: var(--rose); font-family: var(--body); font-weight: 600; font-size: 13px; letter-spacing: .02em; padding: 5px 16px; border-radius: 999px; }
 .match.worst .grade { color: var(--charcoal); }
 .match-head .grade .hj { font-family: var(--hanja); font-size: 16px; letter-spacing: 1px; margin-right: 4px; }
 
-.script .say { font-family: var(--title); font-weight: 500; font-size: 17.5px; line-height: 1.65; letter-spacing: -0.015em; text-align: center; padding: 0 6px 18px; border-bottom: 1px dashed var(--surface-2); color: var(--charcoal-deep); }
+.script .say { font-family: var(--title); font-weight: 600; font-size: 18px; line-height: 1.6; letter-spacing: 0; text-align: center; padding: 0 6px 18px; border-bottom: 1px dashed var(--surface-2); color: var(--charcoal-deep); }
 .script .partner { font-size: 13px; color: var(--gray); text-align: center; margin: 14px 0 0; line-height: 1.7; }
 .script ul { padding: 0; display: grid; gap: 8px; }
 .script li { list-style: none; font-size: 14.5px; line-height: 1.7; padding: 12px 14px 12px 54px; position: relative; background: #fff; border-radius: 12px; box-shadow: inset 0 0 0 1px var(--surface-2); }
@@ -193,7 +193,7 @@ p, li { text-wrap: pretty; }
 .script li.plus::before { background: var(--rose); color: #fff; }
 .script li.minus::before { background: var(--charcoal); color: #fff; }
 .script li.zero::before { content: "·"; color: var(--gray); font-size: 18px; top: 9px; }
-.script .close { margin-top: 22px; padding: 16px 18px; text-align: center; font-family: var(--title); font-weight: 500; font-size: 15px; line-height: 1.6; color: var(--rose); background: #FFE8F1; border-radius: 14px; }
+.script .close { margin-top: 22px; padding: 16px 18px; text-align: center; font-family: var(--title); font-weight: 600; font-size: 15px; line-height: 1.6; color: var(--rose); background: #FFE8F1; border-radius: 14px; }
 .match.worst .script .close { color: var(--charcoal); background: var(--surface-2); }
 
 .card-wrap { margin-top: 24px; text-align: center; }
