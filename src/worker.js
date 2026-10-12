@@ -40,10 +40,17 @@ export default {
       if (!ID_RE.test(id) || !route.valid(value)) return json({ error: "잘못된 값" }, 400);
 
       const all = await readAll();
-      // 처음 입력된 값만 저장 (장난으로 덮어쓰기 방지)
-      if (all[id]) return json({ id, [route.field]: all[id], saved: false });
+      // 기본은 처음 입력된 값만 저장. "수정"(overwrite)일 때만 덮어쓰고, 기록을 남겨서 되돌릴 수 있게 함
+      if (all[id] && !body.overwrite) return json({ id, [route.field]: all[id], saved: false });
+      const before = all[id] || null;
+      if (before === value) return json({ id, [route.field]: value, saved: false });
       all[id] = value;
       await env.BIRTHDAYS.put(route.key, JSON.stringify(all));
+      if (before) {
+        const log = (await env.BIRTHDAYS.get("log", "json")) || [];
+        log.push({ at: new Date().toISOString(), what: route.key, id, from: before, to: value });
+        await env.BIRTHDAYS.put("log", JSON.stringify(log.slice(-300)));
+      }
       return json({ id, [route.field]: value, saved: true });
     }
 

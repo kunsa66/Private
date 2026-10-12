@@ -126,30 +126,52 @@ const suffix = (word, pair) => {
 const josa = (word, pair) => word + suffix(word, pair);
 const stemName = (s) => `${STEMS[s]}(${STEMS_H[s]})`;
 
+/* ---------- 문장 다양화 ----------
+   같은 규칙이라도 문장을 여러 버전으로 두고, 두 사람 조합마다 하나를 고정으로 고름
+   (같은 두 사람은 항상 같은 문장, 다른 조합은 다른 문장) */
+const pairSeed = (A, B) => hash(`${A.id}|${B.id}`);
+const vpick = (text, seed, key) => (Array.isArray(text) ? text[(seed + hash(key || "")) % text.length] : text);
+const makeAdd = (pts, seed) => (delta, short, text) => pts.push({ delta, short, text: vpick(text, seed, short + delta) });
+
 /* ---------- 사주 (40) ---------- */
 function scoreSaju(A, B) {
   const pa = A.pillars, pb = B.pillars;
   const pts = [];
-  const add = (delta, short, text) => pts.push({ delta, short, text });
+  const add = makeAdd(pts, pairSeed(A, B));
   const sa = pa.day.s, sb = pb.day.s, ea = pa.dayEl, eb = pb.dayEl;
 
   const hap = GAN_HAP[`${Math.min(sa, sb)}-${Math.max(sa, sb)}`];
   if (hap) {
-    add(10, "천간합 자석 궁합",
-      `${A.name}의 일간 ${stemName(sa)}, ${B.name}의 일간 ${stemName(sb)}${suffix(STEMS[sb], "이/가")} 만나 ${hap[0]}! 천간합은 사주에서 '보자마자 끌리는' 자석 같은 결합이에요. 둘이 합쳐지면 ${elName(hap[1])}${suffix(ELEMENTS[hap[1]], "이라는/라는")} 새로운 기운까지 만들어냄.`);
+    const pre = `${A.name}의 일간 ${stemName(sa)}, ${B.name}의 일간 ${stemName(sb)}${suffix(STEMS[sb], "이/가")} 만나 ${hap[0]}!`;
+    const born = `${elName(hap[1])}${suffix(ELEMENTS[hap[1]], "이라는/라는")}`;
+    add(10, "천간합 자석 궁합", [
+      `${pre} 천간합은 사주에서 '보자마자 끌리는' 자석 같은 결합이에요. 둘이 합쳐지면 ${born} 새로운 기운까지 만들어냄.`,
+      `${pre} 사주에서 제일 로맨틱한 조합 중 하나예요. 따로 있을 땐 평범한데 둘이 붙으면 ${born} 전혀 다른 기운이 생겨요.`,
+      `${pre} 이건 신령님도 인정하는 '합'이에요. 처음 본 날부터 묘하게 신경 쓰였다면 그게 다 이 합 때문.`,
+    ]);
   } else if ((ea + 1) % 5 === eb || (eb + 1) % 5 === ea) {
     const [g, t] = (ea + 1) % 5 === eb ? [A, B] : [B, A];
     const ge = g.pillars.dayEl, te = t.pillars.dayEl;
-    add(6, "서로 살려주는 상생",
-      `${josa(g.name, "의/의")} ${elName(ge)} 기운이 ${josa(t.name, "의/의")} ${elName(te)} 기운을 살려주는 상생 관계. ${GEN_TEXT[ge]} ${josa(g.name, "이/가")} 밀어주면 ${josa(t.name, "이/가")} 빛나는 구조예요.`);
+    const rel = `${josa(g.name, "의/의")} ${elName(ge)} 기운이 ${josa(t.name, "의/의")} ${elName(te)} 기운을 살려주는 상생 관계.`;
+    add(6, "서로 살려주는 상생", [
+      `${rel} ${GEN_TEXT[ge]} ${josa(g.name, "이/가")} 밀어주면 ${josa(t.name, "이/가")} 빛나는 구조예요.`,
+      `${rel} ${josa(g.name, "은/는")} 퍼주는 쪽, ${josa(t.name, "은/는")} 받아서 크는 쪽. ${josa(t.name, "이/가")} 잘되면 ${g.name}도 괜히 뿌듯한 사이.`,
+      `${rel} ${GEN_TEXT[ge]}, 옆에 있기만 해도 ${josa(t.name, "이/가")} 한 뼘씩 자라는 느낌이에요.`,
+    ]);
   } else if (ea === eb) {
-    add(3, "같은 기운 찐친",
-      `둘 다 ${elName(ea)} 일간. 같은 기운끼리라 말 안 해도 통하는 찐친 같은 사이. 대신 경쟁심도 같이 붙을 수 있음.`);
+    add(3, "같은 기운 찐친", [
+      `둘 다 ${elName(ea)} 일간. 같은 기운끼리라 말 안 해도 통하는 찐친 같은 사이. 대신 경쟁심도 같이 붙을 수 있음.`,
+      `둘 다 ${elName(ea)} 일간이라 거울 보는 느낌. 좋아하는 것도 싫어하는 것도 비슷해서 편한데, 고집 부릴 때도 똑같아요.`,
+      `같은 ${elName(ea)} 일간끼리. 첫 대화부터 '어 나도!'가 연발되는 사이예요. 다만 둘 다 양보는 안 함.`,
+    ]);
   } else {
     const [c, t] = (ea + 2) % 5 === eb ? [A, B] : [B, A];
     const ce = c.pillars.dayEl;
-    add(-6, "기운이 서로 눌러요",
-      `${CTRL_TEXT[ce]} ${josa(c.name, "이/가")} ${josa(t.name, "을/를")} 누르는 상극 관계. ${t.name} 입장에선 같이 있으면 묘하게 숨이 막힐 수 있어요.`);
+    add(-6, "기운이 서로 눌러요", [
+      `${CTRL_TEXT[ce]} ${josa(c.name, "이/가")} ${josa(t.name, "을/를")} 누르는 상극 관계. ${t.name} 입장에선 같이 있으면 묘하게 숨이 막힐 수 있어요.`,
+      `${CTRL_TEXT[ce]}, ${josa(c.name, "은/는")} 별생각 없이 한 말이 ${t.name}에겐 꽤 세게 꽂혀요. 상극이라 그래요.`,
+      `사주로는 ${josa(c.name, "이/가")} ${josa(t.name, "을/를")} 누르는 상극. ${josa(t.name, "이/가")} 이유 없이 기 빨린다고 느낀다면 기분 탓이 아니에요.`,
+    ]);
   }
 
   // 십성: 서로에게 어떤 별인지 (양쪽 다 봄, 합계 -4 ~ +6)
@@ -164,38 +186,59 @@ function scoreSaju(A, B) {
   const da = pa.day.b, db = pb.day.b;
   const dPair = `${BRANCHES[da]}${BRANCHES_H[da]}-${BRANCHES[db]}${BRANCHES_H[db]}`;
   if (isYukHap(da, db)) {
-    add(6, "배우자 자리 육합",
-      `일지(사주에서 '내 짝의 자리')가 ${dPair} 육합! 여기가 합이면 같이 있을 때 편안함이 남다름. 말 안 해도 손발이 맞는 타입.`);
+    add(6, "배우자 자리 육합", [
+      `일지(사주에서 '내 짝의 자리')가 ${dPair} 육합! 여기가 합이면 같이 있을 때 편안함이 남다름. 말 안 해도 손발이 맞는 타입.`,
+      `배우자 자리인 일지끼리 ${dPair} 육합이에요. 같이 있으면 시간 가는 줄 모르는 사이, 침묵도 안 어색해요.`,
+      `일지 ${dPair} 육합. 사주에서 '같이 살면 편한 사람'을 볼 때 제일 먼저 보는 자리가 딱 맞물렸어요.`,
+    ]);
   } else if (samHapGroup(da, db)) {
     const g = samHapGroup(da, db);
-    add(4, "삼합 팀플 궁합",
-      `일지가 ${dPair}로 ${elName(g[1])} 삼합 기운에 묶여요. 공동 목표가 생기면 팀플 최강 조합.`);
+    add(4, "삼합 팀플 궁합", [
+      `일지가 ${dPair}로 ${elName(g[1])} 삼합 기운에 묶여요. 공동 목표가 생기면 팀플 최강 조합.`,
+      `일지 ${dPair} 삼합. 조별과제 같은 조 되면 무조건 A+ 받는 조합이에요.`,
+      `일지끼리 ${elName(g[1])} 삼합으로 묶여서, 같은 방향만 보면 둘이 세 사람 몫을 해요.`,
+    ]);
   } else if (isChung(da, db)) {
-    add(-7, "배우자 자리 충돌",
-      `일지 ${dPair} 충! 배우자 자리끼리 정면충돌이라 같이 있으면 사소한 걸로 자주 부딪혀요.`);
+    add(-7, "배우자 자리 충돌", [
+      `일지 ${dPair} 충! 배우자 자리끼리 정면충돌이라 같이 있으면 사소한 걸로 자주 부딪혀요.`,
+      `일지가 ${dPair} 충이에요. 서로 '왜 저래?' 소리가 하루에 한 번은 나오는 사이.`,
+      `배우자 자리끼리 ${dPair} 충. 좋을 땐 불꽃 튀고, 싸울 땐 더 크게 불꽃 튀어요.`,
+    ]);
   } else if (isWonjin(da, db)) {
-    add(-5, "배우자 자리 원진살",
-      `둘이 일지 ${dPair} 원진살이 있어요… 원진은 '이유 없이 서로 거슬리는' 살이라, 잘 지내다가도 괜히 서운해지는 사이예요.`);
+    add(-5, "배우자 자리 원진살", [
+      `둘이 일지 ${dPair} 원진살이 있어요… 원진은 '이유 없이 서로 거슬리는' 살이라, 잘 지내다가도 괜히 서운해지는 사이예요.`,
+      `일지 ${dPair} 원진살. 딱히 잘못한 것도 없는데 말투 하나에 서로 꽁해지기 쉬워요.`,
+      `원진살이 끼었어요(${dPair}). 미운 정 고운 정 다 드는 사이라, 싫다가도 없으면 허전함.`,
+    ]);
   }
 
   const ya = pa.year.b, yb = pb.year.b;
   const zodiac = `${ANIMALS[ya]}띠와 ${ANIMALS[yb]}띠`;
   if (samHapGroup(ya, yb) || isYukHap(ya, yb)) {
-    add(3, "띠 궁합도 굿", `띠로 봐도 ${zodiac}는 합이 드는 사이. 첫인상부터 호감.`);
+    add(3, "띠 궁합도 굿", [
+      `띠로 봐도 ${zodiac}는 합이 드는 사이. 첫인상부터 호감.`,
+      `${zodiac}는 띠 궁합도 좋아요. 처음 만났을 때 '얘 괜찮네' 했을 확률 높음.`,
+    ]);
   } else if (isChung(ya, yb)) {
-    add(-3, "띠끼리 충", `띠로 보면 ${zodiac}는 충. 첫 만남부터 뭔가 삐걱일 수 있어요.`);
+    add(-3, "띠끼리 충", [
+      `띠로 보면 ${zodiac}는 충. 첫 만남부터 뭔가 삐걱일 수 있어요.`,
+      `${zodiac}는 띠끼리 충이라, 첫인상은 서로 별로였을 수도. 겪어봐야 아는 사이.`,
+    ]);
   } else if (isWonjin(ya, yb)) {
-    add(-3, "띠 원진살", `띠로 보면 ${zodiac}는 원진 관계. 이유 없이 서로 신경 쓰이는 띠 궁합이에요.`);
+    add(-3, "띠 원진살", [
+      `띠로 보면 ${zodiac}는 원진 관계. 이유 없이 서로 신경 쓰이는 띠 궁합이에요.`,
+      `${zodiac}는 원진 띠. 같은 반이면 괜히 눈에 밟히는 사이예요.`,
+    ]);
   }
 
   // 시지(자녀·말년 자리): 둘 다 태어난 시를 알 때만
   if (pa.hour && pb.hour) {
     const ha = pa.hour.b, hb = pb.hour.b;
     const hPair = `${BRANCHES[ha]}${BRANCHES_H[ha]}-${BRANCHES[hb]}${BRANCHES_H[hb]}`;
-    if (isYukHap(ha, hb)) add(3, "시지 육합", `태어난 시끼리 ${hPair} 육합. 시지는 말년 자리라, 오래 볼수록 더 잘 맞는 사이예요.`);
-    else if (samHapGroup(ha, hb)) add(2, "시지 삼합", `태어난 시끼리 ${hPair} 삼합. 나이 들어서도 같은 방향을 보는 사이예요.`);
-    else if (isChung(ha, hb)) add(-3, "시지 충", `태어난 시끼리 ${hPair} 충. 시간이 갈수록 생활 리듬이 부딪힐 수 있어요.`);
-    else if (isWonjin(ha, hb)) add(-2, "시지 원진", `태어난 시끼리 ${hPair} 원진. 오래 붙어 있으면 사소한 습관이 거슬리기 쉬워요.`);
+    if (isYukHap(ha, hb)) add(3, "시지 육합", [`태어난 시끼리 ${hPair} 육합. 시지는 말년 자리라, 오래 볼수록 더 잘 맞는 사이예요.`, `시지 ${hPair} 육합. 10년 뒤 동창회에서 제일 반가울 사이.`]);
+    else if (samHapGroup(ha, hb)) add(2, "시지 삼합", [`태어난 시끼리 ${hPair} 삼합. 나이 들어서도 같은 방향을 보는 사이예요.`, `시지 ${hPair} 삼합. 졸업하고도 연락 이어질 확률 높음.`]);
+    else if (isChung(ha, hb)) add(-3, "시지 충", [`태어난 시끼리 ${hPair} 충. 시간이 갈수록 생활 리듬이 부딪힐 수 있어요.`, `시지 ${hPair} 충. 룸메이트는 비추, 옆 반 친구 정도가 딱.`]);
+    else if (isWonjin(ha, hb)) add(-2, "시지 원진", [`태어난 시끼리 ${hPair} 원진. 오래 붙어 있으면 사소한 습관이 거슬리기 쉬워요.`, `시지 ${hPair} 원진. 수학여행 같은 방은 신중하게.`]);
   }
 
   let fill = 0;
@@ -203,15 +246,20 @@ function scoreSaju(A, B) {
     for (let e = 0; e < 5; e++) {
       if (x.pillars.counts[e] === 0 && y.pillars.counts[e] >= 2 && fill < 6) {
         fill += 3;
-        add(3, `${josa(y.name, "이/가")} ${ELEMENTS[e]} 기운 보충`,
-          `${josa(x.name, "에게/에게")} 없는 ${elName(e)} 기운을 ${josa(y.name, "이/가")} ${y.pillars.counts[e]}개나 가지고 있어요. ${josa(LACK_TEXT[e], "을/를")} 채워주는 보약 같은 존재.`);
+        add(3, `${josa(y.name, "이/가")} ${ELEMENTS[e]} 기운 보충`, [
+          `${josa(x.name, "에게/에게")} 없는 ${elName(e)} 기운을 ${josa(y.name, "이/가")} ${y.pillars.counts[e]}개나 가지고 있어요. ${josa(LACK_TEXT[e], "을/를")} 채워주는 보약 같은 존재.`,
+          `${x.name}의 사주엔 ${elName(e)}${suffix(ELEMENTS[e], "이/가")} 하나도 없는데, ${josa(y.name, "은/는")} ${y.pillars.counts[e]}개나 있어요. ${x.name}한테 부족한 ${LACK_TEXT[e]}, ${josa(y.name, "이/가")} 옆에서 채워줘요.`,
+          `${x.name}의 빈칸(${elName(e)})을 ${josa(y.name, "이/가")} 정확히 메워요. 같이 있으면 ${x.name}의 ${josa(LACK_TEXT[e], "이/가")} 충전되는 느낌.`,
+        ]);
       }
     }
   }
   for (let e = 0; e < 5; e++) {
     if (pa.counts[e] === 0 && pb.counts[e] === 0) {
-      add(-2, `둘 다 ${ELEMENTS[e]}(${ELEMENTS_H[e]}) 기운 없음`,
-        `둘 다 ${elName(e)} 기운이 하나도 없어요. ${josa(LACK_TEXT[e], "이/가")} 같이 부족해서 위기 때 같이 무너질 수도.`);
+      add(-2, `둘 다 ${ELEMENTS[e]}(${ELEMENTS_H[e]}) 기운 없음`, [
+        `둘 다 ${elName(e)} 기운이 하나도 없어요. ${josa(LACK_TEXT[e], "이/가")} 같이 부족해서 위기 때 같이 무너질 수도.`,
+        `둘 다 ${elName(e)} 기운 제로. ${josa(LACK_TEXT[e], "이/가")} 필요한 순간엔 둘 다 서로만 쳐다볼 확률이 높아요.`,
+      ]);
     }
   }
 
@@ -224,14 +272,17 @@ const OPPOSE = [["혼돈", "질서"], ["혼돈", "정의"], ["혼돈", "평화"]
 
 function scoreTraits(A, B) {
   const pts = [];
-  const add = (delta, short, text) => pts.push({ delta, short, text });
+  const add = makeAdd(pts, pairSeed(A, B));
   const ta = A.traits, tb = B.traits;
 
   const shared = A.values.filter((v) => B.values.includes(v));
   if (shared.length) {
     const vs = shared.slice(0, 2).map((v) => `'${v}'`).join("·");
-    add(7 * Math.min(2, shared.length), `둘 다 ${vs}에 진심`,
-      `둘 다 ${vs}에 진심인 타입. 가치관이 같으면 싸워도 결국 같은 편이에요.`);
+    add(7 * Math.min(2, shared.length), `둘 다 ${vs}에 진심`, [
+      `둘 다 ${vs}에 진심인 타입. 가치관이 같으면 싸워도 결국 같은 편이에요.`,
+      `${vs}, 이거 하나로 둘은 말이 통해요. 중요한 순간에 같은 쪽을 고르는 사이.`,
+      `둘 다 ${vs}${suffix(shared.slice(0, 2).at(-1), "을/를")} 제일 중요하게 여겨요. 취향은 달라도 결정적인 데서 의견이 같아요.`,
+    ]);
   }
 
   let opp = 0;
@@ -239,8 +290,11 @@ function scoreTraits(A, B) {
     for (const [P, Q] of [[A, B], [B, A]]) {
       if (opp < 2 && P.values.includes(x) && Q.values.includes(y) && !Q.values.includes(x) && !P.values.includes(y)) {
         opp++;
-        add(-7, `'${x}' vs '${y}'`,
-          `${josa(P.name, "은/는")} '${x}', ${josa(Q.name, "은/는")} '${y}'. 가치관이 정반대라 근본적으로 이해 불가 구역.`);
+        add(-7, `'${x}' vs '${y}'`, [
+          `${josa(P.name, "은/는")} '${x}', ${josa(Q.name, "은/는")} '${y}'. 가치관이 정반대라 근본적으로 이해 불가 구역.`,
+          `'${x}'의 ${P.name}, '${y}'의 ${Q.name}. 같은 걸 봐도 정반대로 해석하는 사이예요.`,
+          `${P.name}한테 중요한 건 '${x}', ${Q.name}한테 중요한 건 '${y}'. 토론 붙이면 해 뜰 때까지 안 끝남.`,
+        ]);
       }
     }
   }
@@ -249,45 +303,92 @@ function scoreTraits(A, B) {
   const wPts = Math.round(((avgW - 1) / 4) * 8);
   if (Math.abs(ta.warmth - tb.warmth) >= 3) {
     const [w, c] = ta.warmth > tb.warmth ? [A, B] : [B, A];
-    add(wPts, "온도 차이 주의", `${josa(w.name, "은/는")} 따뜻, ${josa(c.name, "은/는")} 쿨. 한쪽만 애쓰는 느낌 들 수 있어요.`);
+    add(wPts, "온도 차이 주의", [
+      `${josa(w.name, "은/는")} 따뜻, ${josa(c.name, "은/는")} 쿨. 한쪽만 애쓰는 느낌 들 수 있어요.`,
+      `${josa(w.name, "은/는")} 생일 3일 전부터 선물 고민, ${josa(c.name, "은/는")} 당일에 카톡 한 줄. 온도 차이가 있어요.`,
+      `${w.name}의 다정함을 ${josa(c.name, "이/가")} 알아채는 데 시간이 좀 걸려요. 그래도 알아채긴 함.`,
+    ]);
   } else if (avgW >= 4) {
-    add(wPts, "둘 다 정 많은 타입", "둘 다 정 많은 타입이라 서로 챙기느라 바쁨. 기념일 절대 안 까먹는 조합.");
+    add(wPts, "둘 다 정 많은 타입", [
+      "둘 다 정 많은 타입이라 서로 챙기느라 바쁨. 기념일 절대 안 까먹는 조합.",
+      "둘 다 다정해서, 한 명이 아프면 다른 한 명이 약 사 들고 기숙사 앞에 서 있는 사이.",
+      "정 많은 둘이 만나서 간식 나눠 먹다 보면 둘 다 살찜. 행복한 살.",
+    ]);
   } else if (avgW <= 2) {
-    add(wPts, "둘 다 차도남녀", "둘 다 차가운 편이라 누가 먼저 연락할지 기싸움 예약.");
+    add(wPts, "둘 다 차도남녀", [
+      "둘 다 차가운 편이라 누가 먼저 연락할지 기싸움 예약.",
+      "둘 다 표현을 안 해서, 친한지 안 친한지 본인들도 헷갈리는 사이.",
+      "둘 다 쿨해서 싸울 일은 없는데, 친해질 일도 안 생겨요. 누가 먼저 말 걸어야 함.",
+    ]);
   } else {
     add(wPts, "", "");
   }
 
   const eDiff = Math.abs(ta.energy - tb.energy);
   if (eDiff === 1 || eDiff === 2) {
-    add(6, "텐션 밸런스 굿", "텐션 밸런스가 딱 좋아요. 한 명이 끌고 한 명이 맞춰주는 구조.");
+    add(6, "텐션 밸런스 굿", [
+      "텐션 밸런스가 딱 좋아요. 한 명이 끌고 한 명이 맞춰주는 구조.",
+      "한 명이 '가자!' 하면 한 명이 '어디로?' 하는 적당한 온도 차이. 이게 오래 가요.",
+      "텐션이 살짝 달라서 오히려 좋아요. 지칠 땐 쉬어주고 심심할 땐 끌어주는 사이.",
+    ]);
   } else if (eDiff === 0) {
-    if (ta.energy >= 4) add(4, "둘 다 텐션 MAX", "둘 다 텐션 MAX. 같이 있으면 동네가 시끄러워짐.");
-    else if (ta.energy <= 2) add(4, "둘 다 집콕 재질", "둘 다 집콕 재질이라 조용히 각자 할 일 하는 평화로운 사이.");
+    if (ta.energy >= 4) add(4, "둘 다 텐션 MAX", [
+      "둘 다 텐션 MAX. 같이 있으면 동네가 시끄러워짐.",
+      "둘 다 에너지 과다라, 둘이 복도에 나타나면 선생님이 먼저 한숨 쉼.",
+      "텐션 MAX끼리 만나서 하루가 48시간 같은 사이. 대신 둘 다 다음 날 기절.",
+    ]);
+    else if (ta.energy <= 2) add(4, "둘 다 집콕 재질", [
+      "둘 다 집콕 재질이라 조용히 각자 할 일 하는 평화로운 사이.",
+      "둘 다 조용해서, 같이 있으면 말 없이 30분 지나도 안 어색해요.",
+      "둘 다 에너지 절약형. 약속 취소되면 둘 다 몰래 기뻐하는 사이.",
+    ]);
     else add(4, "", "");
   } else if (eDiff === 3) {
-    add(2, "텐션 차이 있음", "텐션 차이가 꽤 있어요. 한 명은 2차 가자, 한 명은 집 가자.");
+    add(2, "텐션 차이 있음", [
+      "텐션 차이가 꽤 있어요. 한 명은 2차 가자, 한 명은 집 가자.",
+      "한 명은 쉬는 시간마다 매점, 한 명은 쉬는 시간마다 엎드림.",
+    ]);
   } else {
-    add(0, "텐션 극과 극", "텐션이 극과 극. 한 명은 파티 중, 한 명은 이미 귀가함.");
+    add(0, "텐션 극과 극", [
+      "텐션이 극과 극. 한 명은 파티 중, 한 명은 이미 귀가함.",
+      "한 명이 운동장 세 바퀴 돌 동안 한 명은 자리에서 한 번 안 일어남. 극과 극.",
+    ]);
   }
 
   const oDiff = Math.abs(ta.order - tb.order);
   const oPts = Math.round(((4 - oDiff) / 4) * 6);
   if (oDiff >= 3) {
     const [p, q] = ta.order > tb.order ? [A, B] : [B, A];
-    add(oPts, "계획파 vs 즉흥파", `${josa(p.name, "은/는")} 계획파, ${josa(q.name, "은/는")} 즉흥파. 같이 여행 가면 100% 싸움.`);
+    add(oPts, "계획파 vs 즉흥파", [
+      `${josa(p.name, "은/는")} 계획파, ${josa(q.name, "은/는")} 즉흥파. 같이 여행 가면 100% 싸움.`,
+      `${josa(p.name, "은/는")} 시험 2주 전부터 계획표, ${josa(q.name, "은/는")} 전날 밤 벼락치기. 서로 신기해함.`,
+      `${p.name}의 일정표를 ${josa(q.name, "이/가")} 매번 박살 내요. 그래도 ${josa(q.name, "이/가")} 있어서 재밌긴 함.`,
+    ]);
   } else if (oDiff === 0) {
-    add(oPts, "생활 패턴 일치", "생활 패턴이 똑같아서 같이 살아도 될 수준.");
+    add(oPts, "생활 패턴 일치", [
+      "생활 패턴이 똑같아서 같이 살아도 될 수준.",
+      "자는 시간, 먹는 시간, 노는 시간이 비슷해요. 룸메이트 강추.",
+    ]);
   } else add(oPts, "", "");
 
   const sDiff = Math.abs(ta.serious - tb.serious);
   const sPts = Math.round(((4 - sDiff) / 4) * 6);
   if (sDiff >= 3) {
-    add(sPts, "대화 코드 불일치", "한 명은 진지, 한 명은 장난. 대화 코드가 안 맞아서 '지금 그게 웃겨?' 나옴.");
+    add(sPts, "대화 코드 불일치", [
+      "한 명은 진지, 한 명은 장난. 대화 코드가 안 맞아서 '지금 그게 웃겨?' 나옴.",
+      "한 명이 고민 상담할 때 한 명이 드립 치는 사이. 타이밍만 맞추면 괜찮아요.",
+    ]);
   } else if (sDiff <= 1 && ta.serious >= 4 && tb.serious >= 4) {
-    add(sPts, "둘 다 진지 모드", "둘 다 진지해서 대화가 자꾸 토론이 됨 (좋은 의미로).");
+    add(sPts, "둘 다 진지 모드", [
+      "둘 다 진지해서 대화가 자꾸 토론이 됨 (좋은 의미로).",
+      "둘 다 진지충이라 매점 메뉴 고르는 데도 근거를 댐.",
+    ]);
   } else if (sDiff <= 1 && ta.serious <= 2 && tb.serious <= 2) {
-    add(sPts, "드립력 만렙 듀오", "둘 다 드립력 만렙이라 대화가 개그 콘서트.");
+    add(sPts, "드립력 만렙 듀오", [
+      "둘 다 드립력 만렙이라 대화가 개그 콘서트.",
+      "둘이 대화하면 진지한 얘기가 3초를 못 버텨요. 웃다가 끝남.",
+      "드립에 드립으로 받아치는 사이. 옆에 있는 사람이 제일 웃겨함.",
+    ]);
   } else add(sPts, "", "");
 
   for (const [P, Q] of [[A, B], [B, A]]) {
@@ -310,21 +411,81 @@ const MBTI_GOLD = {
 function scoreMbti(A, B) {
   const a = A.mbti.toUpperCase(), b = B.mbti.toUpperCase();
   const pts = [];
-  const add = (delta, short, text) => pts.push({ delta, short, text });
+  const add = makeAdd(pts, pairSeed(A, B));
   let s = 0;
   if ((MBTI_GOLD[a] || []).includes(b) || (MBTI_GOLD[b] || []).includes(a)) {
     s += 4;
-    add(4, "MBTI 천생연분 칸", `${a} × ${b}는 MBTI 궁합표에서 '천생연분' 칸. 과몰입해도 됩니다.`);
+    add(4, "MBTI 천생연분 칸", [`${a} × ${b}는 MBTI 궁합표에서 '천생연분' 칸. 과몰입해도 됩니다.`, `${a}와 ${b}, 인터넷 MBTI 궁합표에서 하트 뜨는 조합이에요.`]);
   }
-  if (a[0] !== b[0]) { s += 4; add(0, "", "E가 끌고 I가 따라가는 클래식 조합."); }
-  else { s += 2; add(0, "", a[0] === "E" ? "둘 다 E라 약속 잡는 속도가 빛의 속도." : "둘 다 I라 약속 취소되면 둘 다 몰래 기뻐함."); }
-  if (a[1] === b[1]) { s += 5; add(0, "", a[1] === "N" ? "둘 다 N이라 '좀비 사태 오면 어떡함?' 같은 망상 대화 가능." : "둘 다 S라 현실 얘기로 착착 통함."); }
-  else { s += 1; add(-2, "S·N 대화 단절", "S와 N 조합. 대화하다 보면 '그게 왜 궁금해?'가 나올 확률 높음."); }
-  if (a[2] !== b[2]) { s += 4; add(0, "", "T와 F 조합. 서로 없는 걸 배우는 관계 (가끔 '너 T야?' 시전)."); }
-  else { s += 2; add(0, "", a[2] === "T" ? "둘 다 T라 팩폭 주고받아도 아무도 안 상처받음." : "둘 다 F라 공감 대잔치, 같이 울어줌."); }
-  if (a[3] !== b[3]) { s += 3; add(0, "", "J와 P, 계획표 짜는 사람과 그걸 무시하는 사람."); }
-  else { s += 2; add(0, "", a[3] === "J" ? "둘 다 J라 엑셀로 데이트 코스 공유함." : "둘 다 P라 약속 장소는 당일에 정함."); }
-  return { score: clamp(s, 0, 20), pts };
+  if (a[0] !== b[0]) { s += 4; add(0, "E/I", ["E가 끌고 I가 따라가는 클래식 조합.", "E가 말하고 I가 들어주는 조합. 의외로 둘 다 만족함."]); }
+  else { s += 2; add(0, "E/I", a[0] === "E" ? ["둘 다 E라 약속 잡는 속도가 빛의 속도.", "둘 다 E라 단톡방이 쉬지를 않음."] : ["둘 다 I라 약속 취소되면 둘 다 몰래 기뻐함.", "둘 다 I라 둘이 있을 땐 조용한데, 둘이 있을 때가 제일 편함."]); }
+  if (a[1] === b[1]) { s += 5; add(0, "S/N", a[1] === "N" ? ["둘 다 N이라 '좀비 사태 오면 어떡함?' 같은 망상 대화 가능.", "둘 다 N이라 '만약에~'로 시작하는 대화가 한 시간째."] : ["둘 다 S라 현실 얘기로 착착 통함.", "둘 다 S라 '그래서 결론이 뭔데?'가 바로 통해요."]); }
+  else { s += 1; add(-2, "S·N 대화 단절", ["S와 N 조합. 대화하다 보면 '그게 왜 궁금해?'가 나올 확률 높음.", "S와 N이라, 한 명은 사실을 말하고 한 명은 상상을 말해요. 대화가 자꾸 엇갈림."]); }
+  if (a[2] !== b[2]) { s += 4; add(0, "T/F", ["T와 F 조합. 서로 없는 걸 배우는 관계 (가끔 '너 T야?' 시전).", "T와 F라, 한 명이 해결책을 줄 때 한 명은 공감을 원해요. 서로 배우는 중."]); }
+  else { s += 2; add(0, "T/F", a[2] === "T" ? ["둘 다 T라 팩폭 주고받아도 아무도 안 상처받음.", "둘 다 T라 위로 대신 해결책을 주고받는 사이."] : ["둘 다 F라 공감 대잔치, 같이 울어줌.", "둘 다 F라 한 명이 서운하면 다른 한 명도 같이 서운해함."]); }
+  if (a[3] !== b[3]) { s += 3; add(0, "J/P", ["J와 P, 계획표 짜는 사람과 그걸 무시하는 사람.", "J와 P라, 한 명은 3일 전에 짐 싸고 한 명은 출발 10분 전에 짐 쌈."]); }
+  else { s += 2; add(0, "J/P", a[3] === "J" ? ["둘 다 J라 엑셀로 데이트 코스 공유함.", "둘 다 J라 약속 시간 5분 전에 이미 둘 다 도착해 있음."] : ["둘 다 P라 약속 장소는 당일에 정함.", "둘 다 P라 계획은 없는데 이상하게 재밌게 놂."]); }
+  return { score: clamp(s, 0, 20), pts: pts.map((p) => (p.delta === 0 && /^[EISNTFJP]\/[EISNTFJP]$/.test(p.short) ? { ...p, short: "" } : p)) };
+}
+
+/* ---------- 케미 포인트 (점수엔 영향 없음, 풀이를 다양하게) ---------- */
+const CHEM = {
+  good: [
+    (A, B, ka, kb) => `${A.name}의 '${ka}' 기질에 ${B.name}의 '${kb}' 기질이 더해지면, 의외로 서로의 빈칸이 딱 맞물려요.`,
+    (A, B, ka, kb) => `'${ka}' ${josa(A.name, "과/와")} '${kb}' ${B.name}. 이 둘이 한 팀이면 반 분위기가 바뀜.`,
+    (A, B, ka, kb) => `${B.name}의 '${kb}' 모먼트를 제일 먼저 알아봐 주는 사람이 ${josa(A.name, "일/일")} 거예요.`,
+    (A, B, ka, kb) => `'${ka}' 모드인 ${josa(A.name, "과/와")} '${kb}' 모드인 ${B.name}, 같이 있으면 둘 다 평소보다 반짝여요.`,
+    (A, B, ka, kb) => `${A.name}의 '${ka}' 기질을 ${josa(B.name, "은/는")} 귀엽다고 생각할 확률이 높아요. 반대도 마찬가지.`,
+  ],
+  mid: [
+    (A, B, ka, kb) => `${A.name}의 '${ka}' 기질과 ${B.name}의 '${kb}' 기질… 잘 맞을 땐 꿀케미, 안 맞을 땐 그냥 지나가는 사이.`,
+    (A, B, ka, kb) => `'${ka}' 대 '${kb}'. 서로 신기해하는 단계에서 멈추면 딱 좋아요.`,
+    (A, B, ka, kb) => `${josa(A.name, "이/가")} '${ka}' 모드일 때 ${B.name}의 '${kb}' 모먼트가 튀어나오면 묘한 정적이 흘러요.`,
+    (A, B, ka, kb) => `${B.name}의 '${kb}' 기질, ${A.name}한테는 아직 해석 중인 영역이에요. 천천히 알아가는 사이.`,
+  ],
+  bad: [
+    (A, B, ka, kb) => `${A.name}의 '${ka}' 기질과 ${B.name}의 '${kb}' 기질이 부딪히면… 주변 사람들이 먼저 자리를 피함.`,
+    (A, B, ka, kb) => `'${ka}' ${A.name} 앞에서 '${kb}' 모먼트는 버튼을 누르는 행위예요. 조심.`,
+    (A, B, ka, kb) => `${B.name}의 '${kb}' 기질이 ${A.name}한테는 이해 불가 영역. 반대도 마찬가지.`,
+    (A, B, ka, kb) => `${josa(A.name, "이/가")} '${ka}' 모드일 때 ${josa(B.name, "이/가")} '${kb}' 모드면, 그날은 둘 다 일찍 자는 게 나아요.`,
+  ],
+};
+const DO_TOGETHER = {
+  high: ["노래방, 놀이공원, 축제 맨 앞줄", "운동장 한 바퀴 내기, 매점 달리기", "체육대회 같은 팀, 응원 단장 콤비", "주말 시내 나가서 하루 종일 쏘다니기"],
+  low: ["도서관 옆자리, 기숙사 휴게실에서 멍때리기", "비 오는 날 창가에서 군것질", "각자 이어폰 끼고 같은 공간에 있기", "야자 시간에 몰래 쪽지 주고받기"],
+  mid: ["급식 같이 먹기, 하굣길 편의점", "시험 기간 스터디 (반은 수다)", "쉬는 시간 매점 원정대", "주말에 맛집 하나 찍고 오기"],
+};
+
+function chemistry(A, B, total) {
+  const seed = pairSeed(A, B);
+  const mood = total >= 60 ? "good" : total >= 45 ? "mid" : "bad";
+  // 동아리 이름·키·혈액형 같은 '라벨' 키워드는 케미 문장에 어색해서 뺌
+  const usable = (c) => { const k = c.keywords.filter((w) => !/(부|팬클럽|학생회|학생회장|cm|형)$/.test(w)); return k.length ? k : c.keywords; };
+  const kwA = usable(A), kwB = usable(B);
+  const ka = kwA[seed % kwA.length];
+  const kb = kwB[(seed >>> 4) % kwB.length];
+  const lines = [pick(CHEM[mood], seed >>> 2)(A, B, ka, kb)];
+
+  const ta = A.traits, tb = B.traits;
+  const eAvg = (ta.energy + tb.energy) / 2;
+  lines.push(`같이 하면 좋은 것: ${pick(DO_TOGETHER[eAvg >= 4 ? "high" : eAvg <= 2 ? "low" : "mid"], seed >>> 6)}`);
+
+  // 조심할 것: 제일 차이 나는 성향 하나
+  const diffs = [
+    ["order", Math.abs(ta.order - tb.order)],
+    ["warmth", Math.abs(ta.warmth - tb.warmth)],
+    ["serious", Math.abs(ta.serious - tb.serious)],
+  ].sort((x, y) => y[1] - x[1]);
+  const [key, gap] = diffs[0];
+  if (gap >= 2) {
+    const hi = ta[key] > tb[key] ? A : B, lo = hi === A ? B : A;
+    if (key === "order") lines.push(`조심할 것: 약속 시간은 ${hi.name}한테 맡기기. ${lo.name}한테 맡기면 당일에 정해짐.`);
+    else if (key === "warmth") lines.push(`조심할 것: ${lo.name}의 무심한 한마디. ${josa(hi.name, "은/는")} 생각보다 오래 기억해요.`);
+    else lines.push(`조심할 것: ${lo.name}의 장난 타이밍. ${josa(hi.name, "이/가")} 진지할 때는 피하기.`);
+  } else {
+    lines.push(`조심할 것: ${pick(["너무 비슷해서 생기는 신경전.", "너무 편해져서 서로를 당연하게 여기기.", "둘이 같이 사고 치면 말려줄 사람이 없음."], seed >>> 8)}`);
+  }
+  return lines;
 }
 
 /* ---------- 종합 ---------- */
@@ -351,32 +512,32 @@ function findMatches(A, list) {
 // open: 리딩 첫 멘트, close: 마무리 멘트 (조합마다 하나씩 고정으로 골라짐)
 const TIERS = [
   { min: 90, hanja: "天生緣分", ko: "천생연분", fu: "合婚符", fuKo: "합혼부",
-    open: ["어머어머… 이건 신령님이 직접 엮어준 조합인데?", "와 소름. 이 둘은 전생에 무조건 아는 사이였음.", "부적 쓰다가 손 떨렸잖아요. 이 조합 뭐야…"],
-    close: ["이 인연 놓치면 3대가 후회함. 부적은 지갑에 꼭 넣고 다니세요.", "오늘부터 이 사람 이름 들리면 귀 쫑긋 하세요. 신호 온 거예요."] },
+    open: ["어머어머… 이건 신령님이 직접 엮어준 조합인데?", "와 소름. 이 둘은 전생에 무조건 아는 사이였음.", "부적 쓰다가 손 떨렸잖아요. 이 조합 뭐야…", "신령님이 이 조합 보더니 갑자기 박수를 치세요."],
+    close: ["이 인연 놓치면 3대가 후회함. 부적은 지갑에 꼭 넣고 다니세요.", "오늘부터 이 사람 이름 들리면 귀 쫑긋 하세요. 신호 온 거예요.", "이 부적은 코팅해서 평생 간직하세요."] },
   { min: 80, hanja: "百年佳約", ko: "백년가약", fu: "愛情符", fuKo: "애정부",
-    open: ["이거 찐이에요. 신령님이 지금 박수 치고 계심.", "오래 볼수록 더 좋아지는 조합. 백년가약 각이에요."],
-    close: ["싸워도 결국 화해하는 사이. 먼저 사과하는 쪽이 이겨요.", "지금 이 인연, 아껴 쓰세요. 오래 갑니다."] },
+    open: ["이거 찐이에요. 신령님이 지금 박수 치고 계심.", "오래 볼수록 더 좋아지는 조합. 백년가약 각이에요.", "어머, 이 둘은 같이 있는 장면이 벌써 그려져요.", "점괘가 너무 좋게 나와서 다시 봤어요. 진짜예요."],
+    close: ["싸워도 결국 화해하는 사이. 먼저 사과하는 쪽이 이겨요.", "지금 이 인연, 아껴 쓰세요. 오래 갑니다.", "10년 뒤에도 연락하고 있을 사이예요. 장담함."] },
   { min: 70, hanja: "琴瑟相和", ko: "금슬상화", fu: "和合符", fuKo: "화합부",
-    open: ["합이 잘 맞아요. 같이 있으면 둘 다 편해지는 사이.", "서로 부족한 데를 딱딱 채워주는 조합이에요."],
-    close: ["사소한 건 맞춰주고, 큰 건 같이 정하면 만사형통.", "부적은 둘이 하나씩 나눠 가지세요. 효과 두 배."] },
+    open: ["합이 잘 맞아요. 같이 있으면 둘 다 편해지는 사이.", "서로 부족한 데를 딱딱 채워주는 조합이에요.", "이 정도면 신령님도 흐뭇하게 보세요.", "기운이 순하게 섞여요. 싸워도 금방 풀리는 사이."],
+    close: ["사소한 건 맞춰주고, 큰 건 같이 정하면 만사형통.", "부적은 둘이 하나씩 나눠 가지세요. 효과 두 배.", "서로한테 고맙다는 말만 자주 하면 완벽해요."] },
   { min: 60, hanja: "吉緣相逢", ko: "길연상봉", fu: "因緣符", fuKo: "인연부",
-    open: ["좋은 인연은 맞아요. 다만 조금 더 알아가야 하는 사이.", "첫인상보다 두 번째 만남이 더 좋은 타입이에요."],
-    close: ["먼저 말 걸면 반은 성공. 나머지 반은 꾸준함.", "천천히 친해질수록 단단해지는 인연이에요."] },
+    open: ["좋은 인연은 맞아요. 다만 조금 더 알아가야 하는 사이.", "첫인상보다 두 번째 만남이 더 좋은 타입이에요.", "괜찮은 기운이에요. 아직 다 안 열어본 선물 같은 사이.", "신령님 말씀이, 이 둘은 '조금만 더'래요."],
+    close: ["먼저 말 걸면 반은 성공. 나머지 반은 꾸준함.", "천천히 친해질수록 단단해지는 인연이에요.", "같이 밥 한 번만 먹어보세요. 그다음부터 달라져요."] },
   { min: 50, hanja: "無難平安", ko: "무난평안", fu: "平安符", fuKo: "평안부",
-    open: ["엄청 끌리는 건 아닌데, 같이 있으면 탈은 없는 사이예요.", "불꽃은 없지만 평화는 있어요. 무난함도 복이에요."],
-    close: ["큰 기대보다 편한 사이로 지내면 딱 좋아요.", "가끔 안부 묻는 사이로 오래 가요."] },
+    open: ["엄청 끌리는 건 아닌데, 같이 있으면 탈은 없는 사이예요.", "불꽃은 없지만 평화는 있어요. 무난함도 복이에요.", "점괘가 딱 중간에 멈췄어요. 노력하기 나름인 사이.", "물에 물 탄 듯, 술에 술 탄 듯. 편하긴 해요."],
+    close: ["큰 기대보다 편한 사이로 지내면 딱 좋아요.", "가끔 안부 묻는 사이로 오래 가요.", "공통 관심사 하나만 찾으면 급격히 친해질 수도."] },
   { min: 40, hanja: "相剋注意", ko: "상극주의", fu: "和解符", fuKo: "화해부",
-    open: ["잠깐만… 신령님이 고개를 갸웃하시는데요?", "기운끼리 살짝 부딪혀요. 말 한마디에 오해가 생기기 쉬운 사이."],
-    close: ["말투만 조심하면 생각보다 괜찮아요. 서운한 건 바로 말하기.", "가까이보단 적당한 거리에서 오래 가는 사이예요."] },
+    open: ["잠깐만… 신령님이 고개를 갸웃하시는데요?", "기운끼리 살짝 부딪혀요. 말 한마디에 오해가 생기기 쉬운 사이.", "음… 점괘에 물음표가 떴어요.", "나쁜 건 아닌데, 사용 설명서가 필요한 조합이에요."],
+    close: ["말투만 조심하면 생각보다 괜찮아요. 서운한 건 바로 말하기.", "가까이보단 적당한 거리에서 오래 가는 사이예요.", "둘 사이에 중재해 줄 친구 하나만 있으면 평화로워요."] },
   { min: 30, hanja: "怨嗔注意", ko: "원진주의", fu: "解怨符", fuKo: "해원부",
-    open: ["이 조합은… 부적 하나로는 안 될 것 같아요.", "어우, 기운끼리 서로 할퀴고 있어요."],
-    close: ["굳이 엮여야 한다면 단톡방까지만. 갠톡 금지.", "같이 있을 땐 둘 다 한 템포 쉬고 말하기. 부적은 필수."] },
+    open: ["이 조합은… 부적 하나로는 안 될 것 같아요.", "어우, 기운끼리 서로 할퀴고 있어요.", "신령님이 잠깐 말을 잃으셨어요.", "점괘 뽑자마자 향이 꺼졌어요. 우연이겠죠…?"],
+    close: ["굳이 엮여야 한다면 단톡방까지만. 갠톡 금지.", "같이 있을 땐 둘 다 한 템포 쉬고 말하기. 부적은 필수.", "미워하진 말고, 그냥 각자의 길을 응원해 주세요."] },
   { min: 0, hanja: "厄運退散", ko: "액운퇴산", fu: "防厄符", fuKo: "방액부",
-    open: ["같은 방에 두면 안 되는 조합, 축하드립니다…", "이거는 부적이 한 장 가지곤 안 되겠는데요...?"],
-    close: ["마주치면 일단 웃으면서 지나가세요. 그게 최선입니다.", "이 부적 붙이면 액운 50% 감소 (신령님 피셜)."] },
+    open: ["같은 방에 두면 안 되는 조합, 축하드립니다…", "이거는 부적이 한 장 가지곤 안 되겠는데요...?", "신령님이 이 조합 보시고 조용히 소금을 찾으세요.", "점괘가 너무 처참해서 오히려 레전드예요."],
+    close: ["마주치면 일단 웃으면서 지나가세요. 그게 최선입니다.", "이 부적 붙이면 액운 50% 감소 (신령님 피셜).", "이 정도면 오히려 서로를 연구해 볼 가치가 있어요."] },
 ];
 
-// 최고인데 점수가 낮거나, 최악인데 점수가 높을 때 앞에 붙이는 한 줄
+// 최고인데 점수가 낮거나, 최악인데 점수가 높을 때 앞에 붙이는 한 줄 (둘이 궁합 모드는 없음)
 function contextLine(kind, total) {
   if (kind === "best" && total < 50) return "솔직히 다 고만고만한데, 이 중에선 이 사람이 제일 나아요.";
   if (kind === "best" && total < 60) return "이 명단 안에서는 제일 잘 맞는 상대예요.";
@@ -386,9 +547,11 @@ function contextLine(kind, total) {
 }
 const tierOf = (total) => TIERS.find((t) => total >= t.min);
 
+// kind: "best" | "worst" | "pair"(둘이 궁합: 점수로 좋은 쪽/나쁜 쪽 이유를 고름)
 function shortReason(kind, r) {
   const all = [...(r.saju ? r.saju.pts : []), ...r.traits.pts, ...r.mbti.pts].filter((p) => p.short);
-  if (kind === "best") {
+  const positive = kind === "best" || (kind === "pair" && r.total >= 50);
+  if (positive) {
     const top = all.filter((p) => p.delta > 0).sort((a, b) => b.delta - a.delta).slice(0, 2);
     return top.length ? top.map((p) => p.short).join(" + ") : "기운이 무난하게 잘 섞이는 조합";
   }
@@ -407,9 +570,9 @@ function reading(kind, A, r) {
     grade: tier.ko,
     serial: String(hash(A.id + r.partner.id + kind) % 10000).padStart(4, "0"),
     short: shortReason(kind, r),
+    chem: chemistry(A, r.partner, r.total),
   };
 }
-
 function selfReading(A) {
   const p = A.pillars;
   const max = Math.max(...p.counts);

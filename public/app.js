@@ -34,10 +34,17 @@ for (const field of Object.keys(SHARED)) {
     .catch(() => { /* 내 PC 미리보기(서버실행.bat)에는 저장소가 없음 → 그냥 넘어감 */ });
 }
 
-async function saveShared(c, field, value) {
-  applyShared(c, field, value);
+// overwrite: 이미 친구가 입력한 값을 "수정"할 때 (서버에 수정 기록이 남음)
+async function saveShared(c, field, value, overwrite = false) {
+  if (overwrite) {
+    c[field] = value;
+    c[SHARED[field].note] = field === "mbti" ? "본인 확인" : "친구가 입력";
+    refreshPillars(c);
+  } else {
+    applyShared(c, field, value);
+  }
   try {
-    const r = await fetch(SHARED[field].api, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: c.id, [field]: value }) });
+    const r = await fetch(SHARED[field].api, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ id: c.id, [field]: value, overwrite }) });
     const res = await r.json();
     // 다른 친구가 먼저 입력해 둔 값이 있으면 그걸 따름
     if (res[field] && res[field] !== c[field]) { c[field] = ""; c[SHARED[field].note] = ""; applyShared(c, field, res[field]); }
@@ -70,6 +77,66 @@ function avatar(c, cls) {
     ? `<img class="${cls}" src="${esc(c.photo)}" alt="">`
     : `<span class="${cls} ph">${esc(c.name.slice(-1))}</span>`;
 }
+/* 모드: "one" = 한 사람의 최고·최악 찾기, "pair" = 고른 두 사람의 궁합 */
+let mode = "one";
+let pairSel = [];
+
+function setMode(m) {
+  mode = m;
+  pairSel = [];
+  document.querySelectorAll("#mode button").forEach((b) => b.classList.toggle("on", b.dataset.mode === m));
+  $("name-label").textContent = m === "pair" ? "궁합 볼 두 사람" : "궁합 볼 이름";
+  $("name-input").placeholder = m === "pair" ? "이름 입력 (두 명)" : "이름 입력";
+  $("name-input").value = "";
+  $("name-err").textContent = "";
+  closeBday();
+  renderPairSlots();
+  renderRoster();
+}
+$("mode").onclick = (e) => { const b = e.target.closest("button"); if (b && b.dataset.mode !== mode) setMode(b.dataset.mode); };
+
+function renderPairSlots() {
+  const box = $("pair-slots");
+  box.hidden = mode !== "pair";
+  if (mode !== "pair") return;
+  const slot = (c, i) => c
+    ? `<button type="button" class="slot filled" data-slot="${i}">${avatar(c, "")}<span>${esc(c.name)}</span><b aria-label="빼기">×</b></button>`
+    : `<span class="slot">${i === 0 ? "첫 번째" : "두 번째"} 사람</span>`;
+  box.innerHTML = `${slot(pairSel[0], 0)}<i>${pairSel.length === 2 ? "緣" : "♡"}</i>${slot(pairSel[1], 1)}`;
+}
+$("pair-slots").onclick = (e) => {
+  const s = e.target.closest(".slot.filled");
+  if (!s) return;
+  pairSel.splice(Number(s.dataset.slot), 1);
+  renderPairSlots();
+  renderRoster();
+};
+
+// 둘이 궁합 모드에서 사람 고르기 (이미 고른 사람은 다시 누르면 빠짐, 세 번째는 두 번째 자리를 바꿈)
+function togglePair(c) {
+  const i = pairSel.indexOf(c);
+  if (i >= 0) pairSel.splice(i, 1);
+  else if (pairSel.length < 2) pairSel.push(c);
+  else pairSel[1] = c;
+  $("name-input").value = "";
+  $("name-err").textContent = "";
+  renderPairSlots();
+  renderRoster();
+}
+
+function runPair() {
+  if (pairSel.length < 2) { $("name-err").textContent = "두 사람을 골라주세요."; return; }
+  const [A, B] = pairSel;
+  show("s-loading");
+  let i = 0;
+  $("loading-msg").textContent = LOADING_MSGS[0];
+  const iv = setInterval(() => {
+    i++;
+    if (i < LOADING_MSGS.length) $("loading-msg").textContent = LOADING_MSGS[i];
+    else { clearInterval(iv); renderPair(A, B); }
+  }, 450);
+}
+
 /* 학년별 명단: 각자 영역 안에서 스크롤, 이름을 치면 양쪽 다 걸러짐 */
 function renderRoster() {
   const n = norm($("name-input").value);
@@ -77,7 +144,7 @@ function renderRoster() {
     const list = CHARACTERS.filter((c) => c.grade === g &&
       (!n || norm(c.name).includes(n) || (c.aliases || []).some((a) => norm(a).includes(n))));
     $(`roster-${g}`).innerHTML = list.length
-      ? `<div class="chips">${list.map((c) => `<button type="button" class="chip" data-n="${esc(c.name)}">${avatar(c, "")}<span>${esc(c.name)}</span></button>`).join("")}</div>`
+      ? `<div class="chips">${list.map((c) => `<button type="button" class="chip${pairSel.includes(c) ? " sel" : ""}" data-n="${esc(c.name)}">${avatar(c, "")}<span>${esc(c.name)}</span></button>`).join("")}</div>`
       : `<p class="empty">${n ? "해당하는 이름 없음" : "명단 없음"}</p>`;
   }
 }
@@ -136,6 +203,8 @@ function goInput() {
   $("name-input").value = "";
   $("name-err").textContent = "";
   closeBday();
+  pairSel = [];
+  renderPairSlots();
   renderRoster();
   show("s-input");
   focusInput();
@@ -145,7 +214,7 @@ document.querySelectorAll("[data-back]").forEach((b) => (b.onclick = goInput));
 $("name-input").oninput = () => {
   $("name-err").textContent = "";
   const c = findChar($("name-input").value);
-  if (c && !c.birth) { if (pending !== c) openBday(c); }
+  if (mode === "one" && c && !c.birth) { if (pending !== c) openBday(c); }
   else if (pending) closeBday();
   renderRoster();
 };
@@ -153,18 +222,27 @@ $("name-input").oninput = () => {
 $("name-form").onsubmit = (e) => {
   e.preventDefault();
   const q = $("name-input").value.trim();
+  // 둘이 궁합: 이름을 치고 엔터하면 한 명씩 추가, 두 명이 차 있으면 바로 궁합
+  if (mode === "pair" && !q) { runPair(); return; }
   if (!q) return;
   const n = norm(q);
   const hits = CHARACTERS.filter((x) => norm(x.name).includes(n));
   const c = findChar(q) || (hits.length === 1 ? hits[0] : null);
   if (!c) { $("name-err").textContent = "명단에 없는 이름이에요. 아래에서 골라주세요."; return; }
+  if (mode === "pair") {
+    if (!pairSel.includes(c)) togglePair(c);
+    if (pairSel.length === 2) runPair();
+    return;
+  }
   choose(c);
 };
 $("s-input").addEventListener("click", (e) => {
   const chip = e.target.closest(".chip");
   if (!chip) return;
   $("name-err").textContent = "";
-  choose(findChar(chip.dataset.n));
+  const c = findChar(chip.dataset.n);
+  if (mode === "pair") togglePair(c);
+  else choose(c);
 });
 
 /* 분석 중 연출 */
@@ -208,6 +286,31 @@ function mbtiFix(A) {
   </div>`;
 }
 
+// 친구가 입력한 생일·시간·MBTI를 고치는 칸 (프로필에 적힌 값은 문서가 우선이라 여기서 못 고침)
+function editPanel(A) {
+  const canBirth = A.birthNote === "친구가 입력";
+  const canHour = A.hourNote === "친구가 입력";
+  const canMbti = !!A.mbtiNote;
+  if (!canBirth && !canHour && !canMbti) return "";
+  const [, m, d] = canBirth ? A.birth.split("-").map(Number) : [];
+  const days = (mm) => new Date(BIRTH_YEAR[A.grade], mm || 1, 0).getDate();
+  const opt = (n, unit, sel) => `<option value="${n}"${n === sel ? " selected" : ""}>${n}${unit}</option>`;
+  return `<details class="edit-box">
+    <summary>입력된 정보가 틀렸나요? 수정하기</summary>
+    <div class="edit-grid">
+      ${canBirth ? `<label>생일 (${BIRTH_YEAR[A.grade]}년생)</label>
+      <div class="edit-row">
+        <select id="edit-m">${Array.from({ length: 12 }, (_, i) => opt(i + 1, "월", m)).join("")}</select>
+        <select id="edit-d">${Array.from({ length: days(m) }, (_, i) => opt(i + 1, "일", d)).join("")}</select>
+      </div>` : ""}
+      ${canHour ? `<label>태어난 시</label><select id="edit-h">${HOUR_SLOTS.map(([n, t]) => `<option value="${n}"${n === A.hour ? " selected" : ""}>${n} (${t})</option>`).join("")}</select>` : ""}
+      ${canMbti ? `<label>MBTI</label><select id="edit-mbti">${MBTI_TYPES.map((t) => `<option value="${t}"${t === A.mbti ? " selected" : ""}>${t}</option>`).join("")}</select>` : ""}
+      <button type="button" class="btn-go" data-edit="${esc(A.id)}">수정 저장</button>
+      <p class="edit-note">친구가 입력한 값만 고칠 수 있어요. 고친 기록은 남아요.</p>
+    </div>
+  </details>`;
+}
+
 function selfPanel(A) {
   const p = A.pillars;
   const head = `<div class="who">
@@ -229,6 +332,7 @@ function selfPanel(A) {
       <div class="section-title">타고난 기운</div>
       <ul class="self-lines">${tags}</ul>
       ${mbtiFix(A)}
+      ${editPanel(A)}
     </div></div>`;
   }
 
@@ -258,6 +362,7 @@ function selfPanel(A) {
       ${tags}
     </ul>
     ${mbtiFix(A)}
+    ${editPanel(A)}
   </div></div>`;
 }
 
@@ -270,38 +375,46 @@ function ptList(pts) {
   }).join("")}</ul>`;
 }
 
-function matchPanel(kind, A, r) {
-  const B = r.partner, info = reading(kind, A, r);
-  return `<div class="panel match ${kind}">
+// view: "best" | "worst" | "pair"(둘이 궁합). 색·아이콘은 점수로 정함
+const themeOf = (view, r) => (view === "pair" ? (r.total >= 50 ? "best" : "worst") : view);
+
+function matchPanel(view, A, r) {
+  const B = r.partner, info = reading(view, A, r), theme = themeOf(view, r);
+  const tag = { best: "최고의 상대", worst: "최악의 상대", pair: "두 사람 궁합" }[view];
+  const who = (c) => `${esc(c.name)} · ${profileLine(c)} · ${c.pillars ? `${pillarText(c.pillars.day)}일주 · ${c.pillars.animal}띠` : "생일 정보 없음"} · ${esc(c.mbti)}<br>${esc(c.oneLiner)}`;
+  return `<div class="panel match ${theme}">
     <div class="match-head">
-      <div class="tag">${kind === "best" ? "최고의 상대" : "최악의 상대"}</div>
-      <div class="duo">${avatar(A, "")}<i>${kind === "best" ? "緣" : "剋"}</i>${avatar(B, "")}</div>
+      <div class="tag">${tag}</div>
+      <div class="duo">${avatar(A, "")}<i>${theme === "best" ? "緣" : "剋"}</i>${avatar(B, "")}</div>
       <div class="vs">${esc(A.name)} · ${esc(B.name)}</div>
       <div class="score">${r.total}<small>점</small></div>
       <div class="grade"><span class="hj">${esc(info.tier.hanja)}</span> ${esc(info.tier.ko)} · ${esc(info.tier.fuKo)}</div>
     </div>
     <div class="panel-in script">
       <div class="say">"${esc(info.open)}"</div>
-      <div class="partner">${esc(B.name)} · ${profileLine(B)} · ${B.pillars ? `${pillarText(B.pillars.day)}일주 · ${B.pillars.animal}띠` : "생일 정보 없음"} · ${esc(B.mbti)}<br>${esc(B.oneLiner)}</div>
+      ${view === "pair" ? `<div class="partner">${who(A)}</div>` : ""}
+      <div class="partner">${who(B)}</div>
       <div class="section-title">사주로 보면</div>
       ${r.saju ? ptList(r.saju.pts) : `<p class="no-saju">${esc(!A.pillars ? A.name : B.name)}의 생일 정보가 없어서 사주는 빼고 봤어요.<br>이 궁합은 성향 70점, MBTI 30점 만점으로 계산했어요.</p>`}
       <div class="section-title">성향으로 보면</div>
       ${ptList(r.traits.pts)}
       <div class="section-title">MBTI ${esc(A.mbti)} × ${esc(B.mbti)}</div>
       ${ptList(r.mbti.pts)}
+      <div class="section-title">케미 포인트</div>
+      <ul>${info.chem.map((l) => `<li class="zero chem" data-d="·">${esc(l)}</li>`).join("")}</ul>
       <div class="close">"${esc(info.close)}"</div>
-      <div class="card-wrap" id="card-${kind}"><div class="card-loading">부적 쓰는 중…</div></div>
+      <div class="card-wrap" id="card-${view}"><div class="card-loading">부적 쓰는 중…</div></div>
     </div>
   </div>`;
 }
 
 let renderToken = 0;
 
-async function renderCard(kind, A, r, token) {
-  const info = reading(kind, A, r);
-  const cv = await makeCard(kind, A, r, info);
+async function renderCard(view, A, r, token) {
+  const info = reading(view, A, r);
+  const cv = await makeCard(themeOf(view, r), A, r, info);
   if (token !== renderToken) return; // 그새 다른 이름을 봤으면 버림
-  const wrap = $(`card-${kind}`);
+  const wrap = $(`card-${view}`);
   let url;
   try {
     url = cv.toDataURL("image/png");
@@ -318,28 +431,67 @@ async function renderCard(kind, A, r, token) {
 
 const IN_FRAME = (() => { try { return window.self !== window.top; } catch (e) { return true; } })();
 
-// 결과 화면에서 태어난 시를 고르면: 저장 → 사주 다시 계산 → 결과 다시 그림 (스크롤 위치 유지)
-// MBTI를 고쳐도 같은 방식
+// 지금 보고 있는 결과 (정보를 고친 뒤 같은 화면을 다시 그리기 위해)
+let lastView = null;
+function redraw() {
+  const y = window.scrollY;
+  if (lastView.type === "pair") renderPair(lastView.A, lastView.B);
+  else renderResult(lastView.A, findMatches(lastView.A, CHARACTERS));
+  window.scrollTo(0, y);
+}
+
+// 결과 화면에서 태어난 시·MBTI를 처음 고르면: 저장 → 다시 계산 → 같은 화면 다시 그림
 $("result").addEventListener("change", (e) => {
+  if (e.target.id === "edit-m") {
+    const A = CHARACTERS.find((c) => c.id === $("result").querySelector("[data-edit]").dataset.edit);
+    const max = new Date(BIRTH_YEAR[A.grade], Number(e.target.value), 0).getDate();
+    const keep = Math.min(Number($("edit-d").value), max);
+    $("edit-d").innerHTML = Array.from({ length: max }, (_, i) => `<option value="${i + 1}"${i + 1 === keep ? " selected" : ""}>${i + 1}일</option>`).join("");
+    return;
+  }
   const field = { "hour-add": "hour", "mbti-fix": "mbti" }[e.target.id];
   if (!field || !e.target.value) return;
   const A = CHARACTERS.find((c) => c.id === e.target.dataset.id);
   if (!A) return;
-  const y = window.scrollY;
   e.target.disabled = true;
-  saveShared(A, field, e.target.value).then(() => {
-    renderResult(A, findMatches(A, CHARACTERS));
-    window.scrollTo(0, y);
-  });
+  saveShared(A, field, e.target.value).then(redraw);
+});
+
+// "수정 저장": 바뀐 값만 덮어쓰기
+$("result").addEventListener("click", (e) => {
+  const btn = e.target.closest("[data-edit]");
+  if (!btn) return;
+  const A = CHARACTERS.find((c) => c.id === btn.dataset.edit);
+  const jobs = [];
+  if ($("edit-m")) {
+    const birth = `${BIRTH_YEAR[A.grade]}-${String($("edit-m").value).padStart(2, "0")}-${String($("edit-d").value).padStart(2, "0")}`;
+    if (birth !== A.birth) jobs.push(saveShared(A, "birth", birth, true));
+  }
+  if ($("edit-h") && $("edit-h").value !== A.hour) jobs.push(saveShared(A, "hour", $("edit-h").value, true));
+  if ($("edit-mbti") && $("edit-mbti").value !== A.mbti) jobs.push(saveShared(A, "mbti", $("edit-mbti").value, true));
+  if (!jobs.length) { btn.textContent = "바뀐 게 없어요"; return; }
+  btn.disabled = true;
+  btn.textContent = "저장 중…";
+  Promise.all(jobs).then(redraw);
 });
 
 function renderResult(A, res) {
+  lastView = { type: "one", A };
   $("result").innerHTML = selfPanel(A) + matchPanel("best", A, res.best) + matchPanel("worst", A, res.worst);
   show("s-result");
   const token = ++renderToken;
   renderCard("best", A, res.best, token).then(() => renderCard("worst", A, res.worst, token));
 }
 
+// 둘이 궁합: 고른 두 사람의 궁합 한 장
+function renderPair(A, B) {
+  lastView = { type: "pair", A, B };
+  const r = compat(A, B);
+  $("result").innerHTML = matchPanel("pair", A, r);
+  show("s-result");
+  const token = ++renderToken;
+  renderCard("pair", A, r, token);
+}
 // 데스크톱에서만 자동 포커스 (아이폰은 키보드가 올라와 명단을 가림)
 function focusInput() {
   if (matchMedia("(hover: hover)").matches) $("name-input").focus();
