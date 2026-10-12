@@ -77,55 +77,46 @@ function avatar(c, cls) {
     ? `<img class="${cls}" src="${esc(c.photo)}" alt="">`
     : `<span class="${cls} ph">${esc(c.name.slice(-1))}</span>`;
 }
-/* 모드: "one" = 한 사람의 최고·최악 찾기, "pair" = 고른 두 사람의 궁합 */
-let mode = "one";
+/* 사람 고르기: 명단 터치 또는 이름 입력으로 최대 두 명.
+   점지 → 한 명이면 최고·최악 상대, 두 명이면 그 둘의 궁합 */
 let pairSel = [];
 
-function setMode(m) {
-  mode = m;
-  pairSel = [];
-  document.querySelectorAll("#mode button").forEach((b) => b.classList.toggle("on", b.dataset.mode === m));
-  $("name-label").textContent = m === "pair" ? "궁합 볼 두 사람" : "궁합 볼 이름";
-  $("name-input").placeholder = m === "pair" ? "이름 입력 (두 명)" : "이름 입력";
-  $("name-input").value = "";
-  $("name-err").textContent = "";
-  closeBday();
-  renderPairSlots();
-  renderRoster();
-}
-$("mode").onclick = (e) => { const b = e.target.closest("button"); if (b && b.dataset.mode !== mode) setMode(b.dataset.mode); };
-
-function renderPairSlots() {
-  const box = $("pair-slots");
-  box.hidden = mode !== "pair";
-  if (mode !== "pair") return;
+function renderSlots() {
   const slot = (c, i) => c
     ? `<button type="button" class="slot filled" data-slot="${i}">${avatar(c, "")}<span>${esc(c.name)}</span><b aria-label="빼기">×</b></button>`
-    : `<span class="slot">${i === 0 ? "첫 번째" : "두 번째"} 사람</span>`;
-  box.innerHTML = `${slot(pairSel[0], 0)}<i>${pairSel.length === 2 ? "緣" : "♡"}</i>${slot(pairSel[1], 1)}`;
+    : `<span class="slot">${i === 0 ? "궁합 볼 사람" : "상대 (선택)"}</span>`;
+  $("pair-slots").innerHTML = `${slot(pairSel[0], 0)}<i>${pairSel.length === 2 ? "緣" : "♡"}</i>${slot(pairSel[1], 1)}`;
+  $("go-hint").textContent = pairSel.length === 2
+    ? `${pairSel[0].name} × ${pairSel[1].name}, 둘의 궁합을 봐요`
+    : pairSel.length === 1 ? `${pairSel[0].name}의 최고·최악 상대를 찾아요. 상대를 한 명 더 고르면 둘의 궁합` : "한 명: 최고·최악 상대 찾기 · 두 명: 둘의 궁합";
 }
 $("pair-slots").onclick = (e) => {
   const s = e.target.closest(".slot.filled");
   if (!s) return;
   pairSel.splice(Number(s.dataset.slot), 1);
-  renderPairSlots();
-  renderRoster();
+  afterSelect();
 };
 
-// 둘이 궁합 모드에서 사람 고르기 (이미 고른 사람은 다시 누르면 빠짐, 세 번째는 두 번째 자리를 바꿈)
-function togglePair(c) {
+// 고르기 (이미 고른 사람은 다시 누르면 빠짐, 두 명이 차 있으면 두 번째 자리를 바꿈)
+function togglePick(c) {
   const i = pairSel.indexOf(c);
   if (i >= 0) pairSel.splice(i, 1);
   else if (pairSel.length < 2) pairSel.push(c);
   else pairSel[1] = c;
   $("name-input").value = "";
+  afterSelect();
+}
+
+// 한 명만 골랐고 그 사람 생일이 없으면 생일칸(선택 입력)을 열어둠
+function afterSelect() {
   $("name-err").textContent = "";
-  renderPairSlots();
+  if (pairSel.length === 1 && !pairSel[0].birth) { if (pending !== pairSel[0]) openBday(pairSel[0]); }
+  else closeBday();
+  renderSlots();
   renderRoster();
 }
 
 function runPair() {
-  if (pairSel.length < 2) { $("name-err").textContent = "두 사람을 골라주세요."; return; }
   const [A, B] = pairSel;
   show("s-loading");
   let i = 0;
@@ -148,9 +139,8 @@ function renderRoster() {
       : `<p class="empty">${n ? "해당하는 이름 없음" : "명단 없음"}</p>`;
   }
 }
-renderRoster();
 
-/* 생일칸 (생일 정보가 없는 사람을 골랐을 때만, 선택 입력) */
+/* 생일칸 (생일 정보가 없는 사람 한 명을 골랐을 때만, 선택 입력) */
 let pending = null;
 let bdayGrade = 2;
 
@@ -173,7 +163,6 @@ $("bday-h").innerHTML = hourOptions("태어난 시 (모르면 비워두기)");
 
 function openBday(c) {
   pending = c;
-  $("name-input").value = c.name;
   $("bday-note").textContent = `${c.name}의 생일 정보가 없어요. 알면 골라주세요. 입력하면 모두의 궁합에 사주가 반영돼요. 모르면 그냥 점지를 누르세요.`;
   $("bday-m").value = "";
   $("bday-h").value = "";
@@ -185,66 +174,55 @@ function closeBday() {
   $("bday").hidden = true;
 }
 
-// 생일이 없는 사람은 한 번 멈춰서 생일칸을 보여줌 (입력은 선택)
-function choose(c) {
-  if (c.birth) { closeBday(); runLoading(c); return; }
-  if (pending !== c) { openBday(c); return; }
+// 한 명: 생일칸에 입력이 있으면 저장하고 진행
+function runSingle(c) {
   const m = Number($("bday-m").value), d = Number($("bday-d").value), h = $("bday-h").value;
+  const typed = pending === c && !c.birth && m && d;
   closeBday();
-  if (m && d) {
+  if (typed) {
     const birth = `${BIRTH_YEAR[bdayGrade]}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
     Promise.all([saveShared(c, "birth", birth), h ? saveShared(c, "hour", h) : null]).then(() => runLoading(c));
   } else {
-    runLoading(c); // 생일 없이 시간만으로는 시주를 못 세움
+    runLoading(c);
   }
 }
 
 function goInput() {
   $("name-input").value = "";
-  $("name-err").textContent = "";
-  closeBday();
   pairSel = [];
-  renderPairSlots();
-  renderRoster();
+  afterSelect();
   show("s-input");
   focusInput();
 }
 document.querySelectorAll("[data-back]").forEach((b) => (b.onclick = goInput));
 
-$("name-input").oninput = () => {
-  $("name-err").textContent = "";
-  const c = findChar($("name-input").value);
-  if (mode === "one" && c && !c.birth) { if (pending !== c) openBday(c); }
-  else if (pending) closeBday();
-  renderRoster();
-};
+$("name-input").oninput = () => { $("name-err").textContent = ""; renderRoster(); };
 
+// 점지(엔터): 칸에 이름이 쳐져 있으면 먼저 고르기에 추가, 비어 있으면 고른 사람으로 진행
 $("name-form").onsubmit = (e) => {
   e.preventDefault();
   const q = $("name-input").value.trim();
-  // 둘이 궁합: 이름을 치고 엔터하면 한 명씩 추가, 두 명이 차 있으면 바로 궁합
-  if (mode === "pair" && !q) { runPair(); return; }
-  if (!q) return;
-  const n = norm(q);
-  const hits = CHARACTERS.filter((x) => norm(x.name).includes(n));
-  const c = findChar(q) || (hits.length === 1 ? hits[0] : null);
-  if (!c) { $("name-err").textContent = "명단에 없는 이름이에요. 아래에서 골라주세요."; return; }
-  if (mode === "pair") {
-    if (!pairSel.includes(c)) togglePair(c);
-    if (pairSel.length === 2) runPair();
+  if (q) {
+    const n = norm(q);
+    const hits = CHARACTERS.filter((x) => norm(x.name).includes(n));
+    const c = findChar(q) || (hits.length === 1 ? hits[0] : null);
+    if (!c) { $("name-err").textContent = "명단에 없는 이름이에요. 아래에서 골라주세요."; return; }
+    // 이름을 쳐서 엔터 → 고르기에만 추가 (한 명 더 칠 수 있게). 진행은 점지를 한 번 더
+    if (!pairSel.includes(c)) togglePick(c);
+    else { $("name-input").value = ""; renderRoster(); }
     return;
   }
-  choose(c);
+  if (!pairSel.length) { $("name-err").textContent = "명단에서 고르거나 이름을 입력해 주세요."; return; }
+  if (pairSel.length === 2) runPair();
+  else runSingle(pairSel[0]);
 };
 $("s-input").addEventListener("click", (e) => {
   const chip = e.target.closest(".chip");
-  if (!chip) return;
-  $("name-err").textContent = "";
-  const c = findChar(chip.dataset.n);
-  if (mode === "pair") togglePair(c);
-  else choose(c);
+  if (chip) togglePick(findChar(chip.dataset.n));
 });
 
+renderSlots();
+renderRoster();
 /* 분석 중 연출 */
 const LOADING_MSGS = ["사주팔자를 펼치는 중", "오행의 흐름을 읽는 중", "인연의 실을 따라가는 중", "궁합 부적을 쓰는 중"];
 function runLoading(c) {
@@ -286,31 +264,35 @@ function mbtiFix(A) {
   </div>`;
 }
 
-// 친구가 입력한 생일·시간·MBTI를 고치는 칸 (프로필에 적힌 값은 문서가 우선이라 여기서 못 고침)
+// 생일 수정/입력 칸: 사주 원국 바로 아래에 버튼으로 노출
+//  - 생일 없음 → 입력 / 친구가 입력 → 수정 / 프로필(문서)에 적힌 생일 → 안내만 (문서가 기준)
 function editPanel(A) {
-  const canBirth = A.birthNote === "친구가 입력";
+  const bState = !A.birth ? "add" : A.birthNote === "친구가 입력" ? "edit" : "locked";
   const canHour = A.hourNote === "친구가 입력";
   const canMbti = !!A.mbtiNote;
-  if (!canBirth && !canHour && !canMbti) return "";
-  const [, m, d] = canBirth ? A.birth.split("-").map(Number) : [];
+  const [, m, d] = bState === "edit" ? A.birth.split("-").map(Number) : [];
   const days = (mm) => new Date(BIRTH_YEAR[A.grade], mm || 1, 0).getDate();
   const opt = (n, unit, sel) => `<option value="${n}"${n === sel ? " selected" : ""}>${n}${unit}</option>`;
-  return `<details class="edit-box">
-    <summary>입력된 정보가 틀렸나요? 수정하기</summary>
-    <div class="edit-grid">
-      ${canBirth ? `<label>생일 (${BIRTH_YEAR[A.grade]}년생)</label>
+  const birthFields = bState === "locked"
+    ? `<p class="edit-note left">이 생일은 프로필(구글 문서)에 적힌 값이라 여기서는 못 고쳐요. 틀렸다면 문서를 고쳐주세요.</p>`
+    : `<label>생일 (${BIRTH_YEAR[A.grade]}년생)</label>
       <div class="edit-row">
-        <select id="edit-m">${Array.from({ length: 12 }, (_, i) => opt(i + 1, "월", m)).join("")}</select>
-        <select id="edit-d">${Array.from({ length: days(m) }, (_, i) => opt(i + 1, "일", d)).join("")}</select>
-      </div>` : ""}
+        <select id="edit-m">${bState === "add" ? `<option value="">월</option>` : ""}${Array.from({ length: 12 }, (_, i) => opt(i + 1, "월", m)).join("")}</select>
+        <select id="edit-d">${bState === "add" ? `<option value="">일</option>` : ""}${Array.from({ length: days(m) }, (_, i) => opt(i + 1, "일", d)).join("")}</select>
+      </div>
+      ${bState === "add" ? `<label>태어난 시 (모르면 비워두기)</label><select id="edit-h">${hourOptions("모름")}</select>` : ""}`;
+  const canSave = bState !== "locked" || canHour || canMbti;
+  return `<details class="edit-box">
+    <summary>${bState === "add" ? "✎ 생일 입력하기" : "✎ 생일 수정하기"}</summary>
+    <div class="edit-grid">
+      ${birthFields}
       ${canHour ? `<label>태어난 시</label><select id="edit-h">${HOUR_SLOTS.map(([n, t]) => `<option value="${n}"${n === A.hour ? " selected" : ""}>${n} (${t})</option>`).join("")}</select>` : ""}
       ${canMbti ? `<label>MBTI</label><select id="edit-mbti">${MBTI_TYPES.map((t) => `<option value="${t}"${t === A.mbti ? " selected" : ""}>${t}</option>`).join("")}</select>` : ""}
-      <button type="button" class="btn-go" data-edit="${esc(A.id)}">수정 저장</button>
-      <p class="edit-note">친구가 입력한 값만 고칠 수 있어요. 고친 기록은 남아요.</p>
+      ${canSave ? `<button type="button" class="btn-go" data-edit="${esc(A.id)}" data-bstate="${bState}">${bState === "add" ? "생일 저장" : "수정 저장"}</button>
+      <p class="edit-note">${bState === "add" ? "입력하면 모두의 궁합에 사주가 반영돼요." : "친구가 입력한 값만 고칠 수 있어요. 고친 기록은 남아요."}</p>` : ""}
     </div>
   </details>`;
 }
-
 function selfPanel(A) {
   const p = A.pillars;
   const head = `<div class="who">
@@ -328,11 +310,11 @@ function selfPanel(A) {
     return `<div class="panel"><div class="panel-in">${head}
       <div class="section-title">사주 원국</div>
       <p class="no-saju">생일 정보가 없어서 사주는 보지 않았어요.<br>궁합은 성향과 MBTI로만 봐요.</p>
+      ${editPanel(A)}
       <div class="meta">${mbtiTag(A)}</div>
       <div class="section-title">타고난 기운</div>
       <ul class="self-lines">${tags}</ul>
       ${mbtiFix(A)}
-      ${editPanel(A)}
     </div></div>`;
   }
 
@@ -351,6 +333,7 @@ function selfPanel(A) {
     <div class="section-title">사주 원국</div>
     <div class="pillars${p.hour ? " four" : ""}">${pillarCell("년주", p.year)}${pillarCell("월주", p.month)}${pillarCell("일주", p.day)}${p.hour ? pillarCell("시주", p.hour) : ""}</div>
     <div class="meta">${date} · ${esc(A.birthNote || "")}${hourInfo}<br>${p.animal}띠 · ${mbtiTag(A)}</div>
+    ${editPanel(A)}
     ${addHour}
     <div class="section-title">오행 분포</div>
     <div class="el-bars">${p.counts.map((c, e) => `<div class="el-bar">${c}<i style="height:${(c / max) * 64}px;background:${ELEMENT_COLORS[e]}"></i><b>${ELEMENTS_H[e]}<small>${ELEMENTS[e]}</small></b></div>`).join("")}</div>
@@ -362,7 +345,6 @@ function selfPanel(A) {
       ${tags}
     </ul>
     ${mbtiFix(A)}
-    ${editPanel(A)}
   </div></div>`;
 }
 
@@ -446,7 +428,8 @@ $("result").addEventListener("change", (e) => {
     const A = CHARACTERS.find((c) => c.id === $("result").querySelector("[data-edit]").dataset.edit);
     const max = new Date(BIRTH_YEAR[A.grade], Number(e.target.value), 0).getDate();
     const keep = Math.min(Number($("edit-d").value), max);
-    $("edit-d").innerHTML = Array.from({ length: max }, (_, i) => `<option value="${i + 1}"${i + 1 === keep ? " selected" : ""}>${i + 1}일</option>`).join("");
+    const blank = $("edit-d").options[0] && $("edit-d").options[0].value === "" ? `<option value="">일</option>` : "";
+    $("edit-d").innerHTML = blank + Array.from({ length: max }, (_, i) => `<option value="${i + 1}"${i + 1 === keep ? " selected" : ""}>${i + 1}일</option>`).join("");
     return;
   }
   const field = { "hour-add": "hour", "mbti-fix": "mbti" }[e.target.id];
@@ -462,12 +445,15 @@ $("result").addEventListener("click", (e) => {
   const btn = e.target.closest("[data-edit]");
   if (!btn) return;
   const A = CHARACTERS.find((c) => c.id === btn.dataset.edit);
+  const adding = btn.dataset.bstate === "add"; // 생일이 없던 사람: 새로 입력 (덮어쓰기 아님)
   const jobs = [];
   if ($("edit-m")) {
-    const birth = `${BIRTH_YEAR[A.grade]}-${String($("edit-m").value).padStart(2, "0")}-${String($("edit-d").value).padStart(2, "0")}`;
-    if (birth !== A.birth) jobs.push(saveShared(A, "birth", birth, true));
+    const m = $("edit-m").value, d = $("edit-d").value;
+    if (adding && (!m || !d)) { btn.textContent = "월·일을 골라주세요"; return; }
+    const birth = `${BIRTH_YEAR[A.grade]}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`;
+    if (birth !== A.birth) jobs.push(saveShared(A, "birth", birth, !adding));
   }
-  if ($("edit-h") && $("edit-h").value !== A.hour) jobs.push(saveShared(A, "hour", $("edit-h").value, true));
+  if ($("edit-h") && $("edit-h").value && $("edit-h").value !== A.hour) jobs.push(saveShared(A, "hour", $("edit-h").value, !adding));
   if ($("edit-mbti") && $("edit-mbti").value !== A.mbti) jobs.push(saveShared(A, "mbti", $("edit-mbti").value, true));
   if (!jobs.length) { btn.textContent = "바뀐 게 없어요"; return; }
   btn.disabled = true;

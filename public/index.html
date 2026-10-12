@@ -18,7 +18,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Hahmlet:wght@500;700;800&family=LXGW+WenKai+TC:wght@400;700&family=Noto+Serif+TC:wght@700;900&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" rel="stylesheet">
 <meta name="theme-color" content="#372E19">
-<meta name="build" content="14">
+<meta name="build" content="15">
 <meta name="description" content="이름을 고르면 사주·성향·MBTI로 최고/최악 궁합 부적을 점지해 드려요">
 <meta property="og:title" content="廢美部 宮合所 · 폐미부 궁합소">
 <meta property="og:description" content="이름을 고르면 최고/최악 궁합 부적을 점지해 드려요">
@@ -48,15 +48,12 @@
       <div class="roster" id="roster-1"></div>
     </div>
     <form id="name-form" class="search" autocomplete="off">
-      <div class="mode" id="mode" role="tablist">
-        <button type="button" data-mode="one" class="on">최고·최악 찾기</button>
-        <button type="button" data-mode="pair">둘이 궁합</button>
-      </div>
-      <h3><label for="name-input" id="name-label">궁합 볼 이름</label></h3>
-      <div class="pair-slots" id="pair-slots" hidden></div>
+      <h3><label for="name-input" id="name-label">궁합 볼 사람</label></h3>
+      <!-- 명단 터치나 이름 입력으로 최대 두 명: 한 명이면 최고·최악, 두 명이면 둘의 궁합 -->
+      <div class="pair-slots" id="pair-slots"></div>
       <div class="field">
         <span class="field-seal" aria-hidden="true">名</span>
-        <input id="name-input" placeholder="이름 입력" enterkeyhint="go" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
+        <input id="name-input" placeholder="이름으로 찾기" enterkeyhint="go" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" />
         <button class="btn-go" type="submit">점지</button>
       </div>
       <!-- 생일 정보가 없는 사람을 골랐을 때만 열림 (입력은 선택) -->
@@ -74,7 +71,7 @@
       </div>
       <p class="err" id="name-err"></p>
     </form>
-    <p class="bottom-hint">명단에서 누르거나 이름을 입력해 주세요</p>
+    <p class="bottom-hint" id="go-hint">한 명: 최고·최악 상대 찾기 · 두 명: 둘의 궁합</p>
   </section>
 
   <!-- 분석 중 -->
