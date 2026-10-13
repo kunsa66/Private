@@ -201,7 +201,7 @@ window.CHARACTERS = [
     traits: { energy: 5, warmth: 3, order: 1, serious: 1 }, values: ["재미", "자유"],
     keywords: ["마이페이스", "닌자부", "철봉 보면 매달림", "오락실 출근", "삼선 슬리퍼"],
     oneLiner: "철봉만 보면 매달리고 오락실에서 초딩이랑 싸우는 닌자부" },
-  { id: "yuchan", photo: "photos/yuchan.jpg", name: "신유찬", grade: 2, gender: "남", birth: "", birthNote: "생일 미기재", mbti: "ENTJ",
+  { id: "yuchan", photo: "photos/yuchan.jpg", name: "신유찬", grade: 2, gender: "남", birth: "", birthNote: "생일 미기재", mbti: "INTP",
     traits: { energy: 4, warmth: 1, order: 3, serious: 3 }, values: ["성공"],
     keywords: ["겠냐?", "직설 막말", "예민 신경질", "인서울 목표", "피구 최애"],
     oneLiner: "뻘소리엔 \"겠냐?\", 직설 때문에 친구 없지만 본인만 괜찮은 인서울 지망생",
