@@ -117,6 +117,54 @@ function noiseTile() {
   x.putImageData(d, 0, 0);
   return (NOISE = c);
 }
+// 곱하기용 입자: 밝은 회색 점들 (흰 종이에도 보이게)
+let GRAIN = null;
+function grainTile() {
+  if (GRAIN) return GRAIN;
+  const c = document.createElement("canvas");
+  c.width = c.height = 256;
+  const x = c.getContext("2d");
+  const d = x.createImageData(256, 256);
+  for (let i = 0; i < d.data.length; i += 4) {
+    const r = Math.random();
+    const v = r < 0.015 ? 175 + Math.random() * 40 : 236 + Math.random() * 19;
+    d.data[i] = d.data[i + 1] = d.data[i + 2] = v;
+    d.data[i + 3] = 255;
+  }
+  x.putImageData(d, 0, 0);
+  return (GRAIN = c);
+}
+function paperTexture(ctx, seedKey) {
+  const rand = seeded(strHash(seedKey + "#tex"));
+  ctx.save();
+  ctx.globalCompositeOperation = "multiply";
+  ctx.globalAlpha = 0.55;
+  ctx.fillStyle = ctx.createPattern(grainTile(), "repeat");
+  ctx.fillRect(0, 0, FW, FH);
+  // 구김: 밝고 어두운 큰 얼룩을 부드럽게
+  ctx.globalCompositeOperation = "soft-light";
+  ctx.globalAlpha = 1;
+  for (let i = 0; i < 26; i++) {
+    const x = rand() * FW, y = rand() * FH, r = 160 + rand() * 360;
+    const g = ctx.createRadialGradient(x, y, 0, x, y, r);
+    const dark = rand() < 0.5;
+    g.addColorStop(0, dark ? "rgba(0,0,0,.16)" : "rgba(255,255,255,.35)");
+    g.addColorStop(1, "rgba(128,128,128,0)");
+    ctx.fillStyle = g;
+    ctx.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  // 구김 선 몇 줄
+  ctx.globalCompositeOperation = "multiply";
+  for (let i = 0; i < 7; i++) {
+    const x1 = rand() * FW, y1 = rand() * FH, a = rand() * Math.PI, len = 400 + rand() * 700;
+    ctx.strokeStyle = "rgba(120,130,150,.07)"; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x1, y1);
+    ctx.lineTo(x1 + Math.cos(a) * len * 0.5 + (rand() - 0.5) * 60, y1 + Math.sin(a) * len * 0.5 + (rand() - 0.5) * 60);
+    ctx.lineTo(x1 + Math.cos(a) * len, y1 + Math.sin(a) * len);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
 function softShadow(ctx, blur = 24, y = 6, a = 0.07) {
   ctx.shadowColor = `rgba(30,40,60,${a})`; ctx.shadowBlur = blur; ctx.shadowOffsetY = y;
 }
@@ -218,7 +266,20 @@ function drawPanel(ctx, P, side, mode, story) {
   rrect(ctx, x, y, w, h, 44); ctx.clip();
   // 배경: 직접 올린 그림 → 프로필 문서 전신 → 두상
   // 크게 확대하고 살짝 기울여서 틀을 빈틈없이 채움 (머리·상반신이 보이게)
-  const bg = (P.art && P.art.img) || P.full || P.photo;
+  const bg = P.bg ? null : (P.art && P.art.img) || P.full || P.photo;
+  if (P.bg && P.bg.kind === "paper") {
+    // 부적: 틀 폭보다 살짝 크게, 세로 가운데
+    const im = P.bg.img, k = (w * 1.1) / im.width;
+    ctx.globalAlpha = 0.42;
+    ctx.drawImage(im, x + w / 2 - (im.width * k) / 2, y + h / 2 - (im.height * k) / 2, im.width * k, im.height * k);
+    ctx.globalAlpha = 1;
+  } else if (P.bg && P.bg.kind === "heart") {
+    // 하트 속 증명사진: SD 머리 위쪽에 보이게
+    const im = P.bg.img, k = (w * 0.82) / im.width;
+    ctx.globalAlpha = 0.62;
+    ctx.drawImage(im, x + w / 2 - (im.width * k) / 2, y + 140, im.width * k, im.height * k);
+    ctx.globalAlpha = 1;
+  }
   if (bg) {
     const tilt = left ? -0.13 : 0.13, c = Math.cos(tilt), s = Math.sin(tilt);
     const cover = Math.max((w * c + h * s) / bg.width, (w * s + h * c) / bg.height);
@@ -380,29 +441,46 @@ function drawTape(ctx, cx, cy, w, rot, style) {
   }
   ctx.restore();
 }
-// 교환일기처럼: 01·03은 A가, 02·04는 B가 쓴 손글씨 (끝에 이름 서명)
+// 교환일기처럼: 01·03은 A가, 02·04는 B가 쓴 손글씨
+// 다꾸처럼 크기·기울기·위치를 제각각 (페어마다 배치 세 가지 중 하나 + 조금씩 흔들기)
+const CARD_LAYOUTS = [
+  [[0, 312, 350, 470, -0.06], [380, 360, 340, 440, 0.05], [20, 820, 340, 470, 0.04], [370, 845, 350, 470, -0.05]],
+  [[10, 330, 340, 450, 0.05], [375, 300, 345, 470, -0.04], [-5, 845, 350, 470, -0.03], [385, 820, 335, 480, 0.06]],
+  [[0, 320, 360, 455, -0.035], [395, 345, 325, 455, 0.07], [30, 830, 330, 480, 0.06], [375, 860, 345, 455, -0.06]],
+];
+function drawSticky(p, w, h) {
+  p.fillStyle = "#E3EDFC"; p.fillRect(0, 0, w, h);
+  p.fillStyle = "rgba(59,123,230,.08)"; p.fillRect(0, 0, w, 46);
+  const g = p.createLinearGradient(w - 70, h - 70, w, h);
+  g.addColorStop(0, "rgba(30,40,60,0)"); g.addColorStop(1, "rgba(30,40,60,.08)");
+  p.fillStyle = g; p.fillRect(0, 0, w, h);
+}
 function drawCards(ctx, story, seedKey, writers) {
   const rand = seeded(strHash(seedKey));
-  const cx0 = PANEL.inset + PANEL.w + 40, cw = FW - cx0 * 2;      // 가운데 영역
-  const gap = 40, w = (cw - gap) / 2, h = 470, ys = [328, 850];
-  const papers = ["lined", "grid", "lined", "dot"].sort(() => rand() - 0.5);
+  const cx0 = PANEL.inset + PANEL.w + 40;
+  const layout = CARD_LAYOUTS[Math.floor(rand() * CARD_LAYOUTS.length)];
+  const papers = ["lined", "grid", "sticky", "dot"].sort(() => rand() - 0.5);
   const tapes = ["stripe", "gray", "plain", "white"].sort(() => rand() - 0.5);
   const placed = [];
   PARTS.forEach(([key, label], i) => {
     const text = story && story.parts ? story.parts[key] : "";
-    const rot = (rand() - 0.5) * 0.07;
-    const x = cx0 + (i % 2) * (w + gap) + (rand() - 0.5) * 14, y = ys[i >> 1] + (rand() - 0.5) * 16;
-    const torn = rand() < 0.5 ? "top" : "bottom";
-    const holes = torn === "bottom" && rand() < 0.6;
+    const [dx, dy, w, h, r0] = layout[i];
+    const rot = r0 + (rand() - 0.5) * 0.02;
+    const x = cx0 + dx + (rand() - 0.5) * 12, y = dy + (rand() - 0.5) * 12;
+    const kind = papers[i];
     ctx.save();
     ctx.translate(x + w / 2, y + h / 2); ctx.rotate(rot); ctx.translate(-w / 2, -h / 2);
     const paper = document.createElement("canvas");
     paper.width = Math.ceil(w); paper.height = Math.ceil(h + 12);
     const p = paper.getContext("2d");
-    paperPath(p, w, h, torn, rand);
-    p.fillStyle = i % 2 ? "#FDFDFB" : "#FFFFFF"; p.fill();
-    p.save(); p.clip(); paperPattern(p, w, h, papers[i]); p.restore();
-    if (holes) punchHoles(p, w);
+    if (kind === "sticky") drawSticky(p, w, h);
+    else {
+      const torn = rand() < 0.5 ? "top" : "bottom";
+      paperPath(p, w, h, torn, rand);
+      p.fillStyle = i % 2 ? "#FDFDFB" : "#FFFFFF"; p.fill();
+      p.save(); p.clip(); paperPattern(p, w, h, kind); p.restore();
+      if (torn === "bottom" && rand() < 0.6) punchHoles(p, w);
+    }
     softShadow(ctx, 14, 5, 0.1);
     ctx.drawImage(paper, 0, 0);
     noShadow(ctx);
@@ -412,17 +490,18 @@ function drawCards(ctx, story, seedKey, writers) {
     const nw = ctx.measureText(`0${i + 1}`).width;
     ctx.font = `38px ${FF.title}`;
     const lw = ctx.measureText(label).width;
-    ctx.fillStyle = "rgba(150,186,240,.45)";
+    ctx.fillStyle = kind === "sticky" ? "rgba(255,255,255,.8)" : "rgba(150,186,240,.45)";
     ctx.fillRect(36 + nw + 12, 72, lw + 10, 18);
     ctx.fillStyle = FC.ink;
     ctx.fillText(label, 36 + nw + 16, 88);
-    // 본문: 줄 노트 줄에 맞춤
+    // 본문: 손글씨 (줄 노트면 줄에 맞춤)
     if (text) {
       const who = writers ? writers[i % 2] : null;
       const girl = who && who.gender === "여";
       const font = girl ? FF.handGirl : FF.handBoy;
       const sizes = girl ? [30, 29, 28, 27, 26] : [35, 34, 33, 32, 31];
-      const { lines, size } = fitText(ctx, text, w - 72, 8, (z) => `400 ${z}px ${font}`, sizes);
+      const maxLines = Math.floor((h - 168) / 37) + 1;
+      const { lines, size } = fitText(ctx, text, w - 72, maxLines, (z) => `400 ${z}px ${font}`, sizes);
       ctx.font = `400 ${size}px ${font}`; ctx.fillStyle = FC.text;
       lines.forEach((l, k) => ctx.fillText(l, 38, 143 + k * 37));
     } else {
@@ -430,17 +509,17 @@ function drawCards(ctx, story, seedKey, writers) {
       ctx.fillText("아직 썰이 없어요", w / 2, h / 2 + 30);
     }
     ctx.restore();
-    placed.push({ x, y, w });
+    placed.push({ x, y, w, h, sticky: kind === "sticky" });
   });
-  // 테이프 (한 장에 하나, 가끔 양쪽 모서리)
-  placed.forEach(({ x, y, w }, i) => {
+  // 테이프: 위에 하나(가끔 양쪽 모서리), 아래 모서리에도 엇갈리게. 포스트잇은 테이프 없이
+  placed.forEach(({ x, y, w, h, sticky }, i) => {
+    if (sticky) return;
     if (rand() < 0.35) {
       drawTape(ctx, x + 22, y + 12, 110, -0.7 + rand() * 0.2, tapes[i]);
       drawTape(ctx, x + w - 22, y + 12, 110, 0.7 - rand() * 0.2, tapes[i]);
     } else {
       drawTape(ctx, x + w / 2 + (rand() - 0.5) * 90, y + 4, 140 + rand() * 30, (rand() - 0.5) * 0.35, tapes[i]);
     }
-    // 아래쪽 모서리에도 (대각선으로 엇갈리게 균형 맞춤)
     if (i === 1 || i === 2 || rand() < 0.3) {
       const right = i % 2 === 0;
       drawTape(ctx, right ? x + w - 18 : x + 18, y + h - 10, 104, right ? -0.72 : 0.72, tapes[(i + 2) % 4]);
@@ -459,12 +538,9 @@ function drawDeco(ctx) {
   // 별
   drawStar(ctx, L + PANEL.w - 12, T + 18, 34, 0.25, FC.blue, FC.ink);
   drawStar(ctx, R - PANEL.w + 14, T + 22, 24, -0.2, "#fff", FC.ink);
-  drawStar(ctx, L + 30, Bt - 40, 22, 0.15, "#fff", FC.ink);
   // 반짝이
   sparkle(ctx, L + PANEL.w + 20, 842, 16, FC.blue);
   sparkle(ctx, R - PANEL.w - 18, 318, 13, FC.blue);
-  sparkle(ctx, R - PANEL.w - 22, 1110, 10, FC.blue);
-  sparkle(ctx, L + PANEL.w + 18, 1240, 9, FC.blue);
 }
 
 /* ---------- 배경에 깔리는 청춘 소품 (틀 뒤로 살짝 삐져나오게, 연하게) ---------- */
@@ -475,7 +551,7 @@ function at(ctx, x, y, rot, alpha, fn) {
   ctx.restore();
 }
 // 찢은 줄 노트
-function propNotebook(ctx, w, h, rand) {
+function propNotebook(ctx, w, h, rand, kind = "lined") {
   softShadow(ctx, 16, 6, 0.1);
   ctx.beginPath();
   ctx.moveTo(-w / 2, -h / 2); ctx.lineTo(w / 2, -h / 2); ctx.lineTo(w / 2, h / 2);
@@ -484,14 +560,22 @@ function propNotebook(ctx, w, h, rand) {
   ctx.fillStyle = "#FDFDFC"; ctx.fill();
   noShadow(ctx);
   ctx.save(); ctx.clip();
-  ctx.strokeStyle = "rgba(59,123,230,.18)"; ctx.lineWidth = 2;
-  for (let y = -h / 2 + 90; y < h / 2; y += 34) { ctx.beginPath(); ctx.moveTo(-w / 2, y); ctx.lineTo(w / 2, y); ctx.stroke(); }
-  ctx.strokeStyle = "rgba(229,72,77,.25)";
-  ctx.beginPath(); ctx.moveTo(-w / 2 + 60, -h / 2); ctx.lineTo(-w / 2 + 60, h / 2); ctx.stroke();
+  if (kind === "grid") {
+    ctx.strokeStyle = "rgba(120,135,160,.16)"; ctx.lineWidth = 1.5;
+    for (let x = -w / 2 + 14; x < w / 2; x += 28) { ctx.beginPath(); ctx.moveTo(x, -h / 2); ctx.lineTo(x, h / 2); ctx.stroke(); }
+    for (let y = -h / 2 + 14; y < h / 2; y += 28) { ctx.beginPath(); ctx.moveTo(-w / 2, y); ctx.lineTo(w / 2, y); ctx.stroke(); }
+  } else {
+    ctx.strokeStyle = "rgba(59,123,230,.18)"; ctx.lineWidth = 2;
+    for (let y = -h / 2 + 90; y < h / 2; y += 34) { ctx.beginPath(); ctx.moveTo(-w / 2, y); ctx.lineTo(w / 2, y); ctx.stroke(); }
+    ctx.strokeStyle = "rgba(229,72,77,.25)";
+    ctx.beginPath(); ctx.moveTo(-w / 2 + 60, -h / 2); ctx.lineTo(-w / 2 + 60, h / 2); ctx.stroke();
+  }
   ctx.restore();
-  ctx.save(); ctx.fillStyle = FC.bg; // 구멍: 바탕색으로 (전체 그림을 뚫지 않게)
-  for (let y = -h / 2 + 40; y < h / 2 - 20; y += 40) { ctx.beginPath(); ctx.arc(-w / 2 + 24, y, 8, 0, Math.PI * 2); ctx.fill(); }
-  ctx.restore();
+  if (kind === "lined") {
+    ctx.save(); ctx.fillStyle = FC.bg; // 구멍: 바탕색으로 (전체 그림을 뚫지 않게)
+    for (let y = -h / 2 + 40; y < h / 2 - 20; y += 40) { ctx.beginPath(); ctx.arc(-w / 2 + 24, y, 8, 0, Math.PI * 2); ctx.fill(); }
+    ctx.restore();
+  }
 }
 // 폰 (잠금화면에 시간)
 function propPhone(ctx) {
@@ -512,78 +596,14 @@ function propPhone(ctx) {
   ctx.fillStyle = "#8A919C"; ctx.font = `500 17px ${FF.body}`;
   ctx.fillText("재생 중 · 0:42", -w / 2 + 48, -h / 2 + 308);
 }
-// 하늘 사진 폴라로이드
-function propPolaroid(ctx) {
-  const w = 230, h = 270;
-  softShadow(ctx, 14, 6, 0.12);
-  ctx.fillStyle = "#fff"; ctx.fillRect(-w / 2, -h / 2, w, h);
-  noShadow(ctx);
-  const g = ctx.createLinearGradient(0, -h / 2 + 14, 0, h / 2 - 60);
-  g.addColorStop(0, "#6FA5EE"); g.addColorStop(1, "#D9E8FB");
-  ctx.fillStyle = g; ctx.fillRect(-w / 2 + 14, -h / 2 + 14, w - 28, h - 74);
-  ctx.fillStyle = "rgba(255,255,255,.92)";
-  [[-30, 30, 30], [0, 18, 38], [34, 32, 28], [62, 40, 20], [-58, 42, 20]].forEach(([cx, cy, r]) => { ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill(); });
-  ctx.fillStyle = "#8A919C"; ctx.textAlign = "center"; ctx.font = `400 30px ${FF.handGirl}`;
-  ctx.fillText("여름, 운동장", 0, h / 2 - 22);
-}
-// 카세트테이프
-function propCassette(ctx) {
-  const w = 330, h = 210;
-  softShadow(ctx, 14, 6, 0.12);
-  ctx.fillStyle = "#D6E2F5"; rrect(ctx, -w / 2, -h / 2, w, h, 16); ctx.fill();
-  noShadow(ctx);
-  ctx.fillStyle = "#fff"; rrect(ctx, -w / 2 + 20, -h / 2 + 18, w - 40, 120, 10); ctx.fill();
-  ctx.fillStyle = "#3B7BE6"; ctx.fillRect(-w / 2 + 20, -h / 2 + 18, w - 40, 26);
-  ctx.fillStyle = "#3A404B"; ctx.textAlign = "left"; ctx.font = `400 30px ${FF.handBoy}`;
-  ctx.fillText("MIX TAPE ♡ 2026", -w / 2 + 34, -h / 2 + 76);
-  ctx.fillStyle = "#AEB9C9"; rrect(ctx, -84, -h / 2 + 88, 168, 40, 20); ctx.fill();
-  [-50, 50].forEach((cx) => {
-    ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(cx, -h / 2 + 108, 15, 0, Math.PI * 2); ctx.fill();
-    ctx.fillStyle = "#AEB9C9"; ctx.beginPath(); ctx.arc(cx, -h / 2 + 108, 6, 0, Math.PI * 2); ctx.fill();
-  });
-  ctx.fillStyle = "#C3D2EA"; rrect(ctx, -100, h / 2 - 50, 200, 40, 8); ctx.fill();
-}
-// 학생증
-function propIdCard(ctx) {
-  const w = 330, h = 210;
-  softShadow(ctx, 14, 6, 0.12);
-  ctx.fillStyle = "#fff"; rrect(ctx, -w / 2, -h / 2, w, h, 16); ctx.fill();
-  noShadow(ctx);
-  ctx.save(); rrect(ctx, -w / 2, -h / 2, w, h, 16); ctx.clip();
-  ctx.fillStyle = "#3B7BE6"; ctx.fillRect(-w / 2, -h / 2, w, 52);
-  ctx.restore();
-  ctx.fillStyle = "#fff"; ctx.textAlign = "left"; ctx.font = `30px ${FF.title}`;
-  ctx.fillText("태풍고등학교", -w / 2 + 22, -h / 2 + 38);
-  ctx.fillStyle = "#E4E7EC"; ctx.fillRect(-w / 2 + 22, -h / 2 + 70, 86, 108);
-  ctx.fillStyle = "#C3C9D2";
-  [[0, 160], [26, 120], [52, 140], [78, 90]].forEach(([dy, lw]) => ctx.fillRect(-w / 2 + 128, -h / 2 + 80 + dy, lw, 12));
-  ctx.fillStyle = "#8A919C"; ctx.font = `700 15px ${FF.body}`;
-  ctx.fillText("STUDENT ID", -w / 2 + 128, h / 2 - 22);
-}
-// 축제 입장권
-function propTicket(ctx) {
-  const w = 300, h = 120;
-  softShadow(ctx, 12, 5, 0.12);
-  ctx.fillStyle = "#E3EDFC"; ctx.fillRect(-w / 2, -h / 2, w, h);
-  noShadow(ctx);
-  ctx.save(); ctx.fillStyle = FC.bg;
-  [[-w / 2, 0], [w / 2, 0]].forEach(([cx, cy]) => { ctx.beginPath(); ctx.arc(cx, cy, 16, 0, Math.PI * 2); ctx.fill(); });
-  ctx.restore();
-  ctx.setLineDash([6, 6]); ctx.strokeStyle = "#9DBBEA"; ctx.lineWidth = 2;
-  ctx.beginPath(); ctx.moveTo(w / 2 - 74, -h / 2 + 8); ctx.lineTo(w / 2 - 74, h / 2 - 8); ctx.stroke(); ctx.setLineDash([]);
-  ctx.fillStyle = "#3B7BE6"; ctx.textAlign = "left"; ctx.font = `34px ${FF.title}`;
-  ctx.fillText("ADMIT ONE", -w / 2 + 26, -4);
-  ctx.fillStyle = "#8A919C"; ctx.font = `600 16px ${FF.body}`;
-  ctx.fillText("태풍고 가을 축제 · No.0715", -w / 2 + 26, 30);
-}
 function drawBackdrop(ctx, seedKey) {
   const rand = seeded(strHash(seedKey + "#bg"));
-  at(ctx, 120, 210, -0.22, 0.9, () => propNotebook(ctx, 460, 600, rand));      // 왼쪽 위
-  at(ctx, 1352, 40, 0.2, 0.85, () => propPolaroid(ctx));                       // 위 가운데 오른쪽
-  at(ctx, 1950, 150, 0.42, 0.85, () => propTicket(ctx));                       // 오른쪽 위
-  at(ctx, 1935, 1240, -0.32, 0.8, () => propPhone(ctx));                       // 오른쪽 아래
-  at(ctx, 760, 1430, -0.08, 0.85, () => propCassette(ctx));                    // 아래 가운데
-  at(ctx, 70, 1330, 0.32, 0.85, () => propIdCard(ctx));                        // 왼쪽 아래
+  // 종이 몇 장 + 폰 하나만 (가장자리로 살짝 삐져나오게)
+  at(ctx, 120, 210, -0.22, 0.9, () => propNotebook(ctx, 460, 600, rand, "lined"));     // 왼쪽 위
+  at(ctx, 1880, 150, 0.28, 0.85, () => propNotebook(ctx, 420, 520, rand, "grid"));     // 오른쪽 위
+  at(ctx, 1000, 1470, -0.05, 0.85, () => propNotebook(ctx, 640, 300, rand, "grid"));   // 아래 가운데
+  at(ctx, 80, 1290, 0.2, 0.85, () => propNotebook(ctx, 380, 480, rand, "lined"));      // 왼쪽 아래
+  at(ctx, 1935, 1240, -0.32, 0.85, () => propPhone(ctx));                              // 오른쪽 아래
 }
 
 /* ---------- 전체 ---------- */
@@ -605,13 +625,8 @@ function drawFrame(canvas, opts) {
 
   drawDeco(ctx);
 
-  // 은은한 종이 질감
-  ctx.save();
-  ctx.globalCompositeOperation = "overlay";
-  ctx.globalAlpha = 0.06;
-  ctx.fillStyle = ctx.createPattern(noiseTile(), "repeat");
-  ctx.fillRect(0, 0, FW, FH);
-  ctx.restore();
+  // 종이 질감: 고운 입자(곱하기) + 살짝 구겨진 종이 같은 큰 얼룩
+  paperTexture(ctx, `${A.c.id}|${B.c.id}`);
   return canvas;
 }
 

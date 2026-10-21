@@ -3,7 +3,7 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]);
 const norm = (s) => String(s || "").replace(/\s+/g, "").toLowerCase();
 const ROSTER = PAIR_ROSTER.map((id) => CHARACTERS.find((c) => c.id === id)).filter(Boolean);
-const KINDS = [["small", "작은 SD"], ["tall", "길쭉한 SD"], ["art", "배경 그림"]];
+const KINDS = [["small", "작은 SD"], ["tall", "길쭉한 SD"]];
 const pairKey = (a, b) => [a.id, b.id].sort().join("|");
 
 let sel = [null, null];
@@ -33,10 +33,69 @@ async function loadIndex() {
     apiOk = true;
   } catch (e) { apiOk = false; }
 }
+// 궁합소와 같은 공유값: 친구들이 넣은 생일·태어난 시(사주 계산용), 본인이 고친 MBTI
 async function loadMbti() {
-  try { mbtiFix = await (await fetch("/api/mbti", { cache: "no-store" })).json(); } catch (e) { mbtiFix = {}; }
+  const get = async (api) => { try { return await (await fetch(api, { cache: "no-store" })).json(); } catch (e) { return {}; } };
+  const [births, hours, mbti] = await Promise.all([get("/api/birthdays"), get("/api/hours"), get("/api/mbti")]);
+  mbtiFix = mbti;
+  for (const c of CHARACTERS) {
+    if (!c.birth && births[c.id]) c.birth = births[c.id];
+    if (!c.hour && hours[c.id]) c.hour = hours[c.id];
+    if (mbti[c.id] && !c.mbtiNote) c.mbti = mbti[c.id];
+  }
+  CHARACTERS.forEach((c) => (c.pillars = c.birth ? getPillars(c.birth, c.hour) : null));
 }
-const loadImage = (src) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
+
+/* ---------- 긴 틀 배경: 궁합소 부적 (왼쪽 = 부적 틀, 오른쪽 = 하트 속 증명사진) ---------- */
+const talismanCache = {};
+function talismanOf(A, B) {
+  const key = `${A.id}|${B.id}`;
+  if (talismanCache[key]) return talismanCache[key];
+  return (talismanCache[key] = (async () => {
+    const r = compat(A, B);
+    const info = reading("pair", A, r);
+    const kind = r.total >= 50 ? "best" : "worst";
+    const t = THEME[kind];
+    const hanja = `${SITE.titleHanja}勅令急如律百年同樂惡緣退散點神託發行第號符剋緣${info.tier.hanja}${info.tier.fu}0123456789`;
+    const korean = [A.name, B.name, info.short, info.tier.ko, info.tier.fuKo, "태풍고 폐미부 발행 학년 · 0123456789"].join("");
+    await Promise.all([
+      document.fonts.load(`800 40px ${F_TITLE}`, korean), document.fonts.load(`700 28px ${F_TITLE}`, korean),
+      document.fonts.load(`900 190px ${F_BOLD}`, hanja), document.fonts.load(`700 28px ${F_BOLD}`, hanja),
+    ]).catch(() => {});
+    // 왼쪽: 사진 없는 부적 (한자 · 부적 틀 · 점수 · 신탁)
+    const { W, H } = LAYOUT;
+    const cv = document.createElement("canvas");
+    cv.width = W; cv.height = H;
+    const ctx = cv.getContext("2d");
+    drawBackground(ctx, kind, info);
+    drawSeal(ctx, 830, 640, 130, 0.08, t.ink, t.paper, [[`${r.total}`, `800 56px ${F_TITLE}`, -12], ["點", `900 26px ${F_BOLD}`, 34]]);
+    const rb = LAYOUT.reason;
+    ctx.strokeStyle = t.ink; ctx.lineWidth = 2; ctx.strokeRect(rb.x, rb.y, rb.w, rb.h);
+    drawSeal(ctx, rb.x + 72, rb.y + rb.h / 2, 72, 0, t.ink, t.paper, [["神託", `900 24px ${F_BOLD}`, 1]]);
+    ctx.fillStyle = t.text; ctx.font = `700 36px ${F_TITLE}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const lines = wrapText(ctx, info.short, rb.w - 190).slice(0, 2);
+    lines.forEach((l, i) => ctx.fillText(l, rb.x + 126 + (rb.w - 146) / 2, rb.y + rb.h / 2 - ((lines.length - 1) * 54) / 2 + i * 54));
+    const pp = LAYOUT.paper;
+    const paper = document.createElement("canvas");
+    paper.width = pp.w; paper.height = pp.h;
+    paper.getContext("2d").drawImage(cv, pp.x, pp.y, pp.w, pp.h, 0, 0, pp.w, pp.h);
+    // 오른쪽: 부적 카드 그대로 만들어서 하트 부분만 (두 사람 증명사진 + 緣 도장 + 이름)
+    const card = await makeCard(kind, { ...A, photo: `../${A.photo}` }, { ...r, partner: { ...B, photo: `../${B.photo}` } }, info);
+    const hp = LAYOUT.heart, hx = W / 2 - hp.w / 2 - 30, hy = hp.top - 50;
+    const heart = document.createElement("canvas");
+    heart.width = hp.w + 60; heart.height = hp.h + 80;
+    const hc = heart.getContext("2d");
+    hc.drawImage(card, hx, hy, heart.width, heart.height, 0, 0, heart.width, heart.height);
+    // 가장자리를 둥글게 흐리게 (네모난 종이 테두리가 안 보이게)
+    hc.globalCompositeOperation = "destination-in";
+    hc.translate(heart.width / 2, heart.height / 2); hc.scale(1, heart.height / heart.width);
+    const g = hc.createRadialGradient(0, 0, heart.width * 0.3, 0, 0, heart.width * 0.52);
+    g.addColorStop(0, "rgba(0,0,0,1)"); g.addColorStop(1, "rgba(0,0,0,0)");
+    hc.fillStyle = g; hc.fillRect(-heart.width, -heart.width, heart.width * 2, heart.width * 2);
+    return { paper, heart, total: r.total, tier: info.tier };
+  })().catch(() => null));
+}
+const loadImg = (src) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
 
 async function sdOf(c, kind) {
   const local = localImg[`${c.id}:${kind}`];
@@ -44,25 +103,25 @@ async function sdOf(c, kind) {
   if (local && (!meta || local.v >= meta.v)) return local;
   if (!meta) return null;
   const k = `${c.id}:${kind}:${meta.v}`;
-  if (!imgCache[k]) imgCache[k] = loadImage(`/api/sd/${c.id}/${kind}?v=${meta.v}`).catch(() => null);
+  if (!imgCache[k]) imgCache[k] = loadImg(`/api/sd/${c.id}/${kind}?v=${meta.v}`).catch(() => null);
   const img = await imgCache[k];
   return img ? { img, s: meta.s || 1, v: meta.v } : null;
 }
 const fullCache = {};
 async function fullOf(c) {
   if (!(window.PAIR_FULL || []).includes(c.id)) return null;
-  if (!fullCache[c.id]) fullCache[c.id] = loadImage(`../full/${c.id}.jpg`).catch(() => null);
+  if (!fullCache[c.id]) fullCache[c.id] = loadImg(`../full/${c.id}.jpg`).catch(() => null);
   return fullCache[c.id];
 }
 async function photoOf(c) {
   if (!c.photo) return null;
-  if (!photoCache[c.id]) photoCache[c.id] = loadImage(`../${c.photo}`).catch(() => null);
+  if (!photoCache[c.id]) photoCache[c.id] = loadImg(`../${c.photo}`).catch(() => null);
   return photoCache[c.id];
 }
 
 /* ---------- 이미지 손질: 흰 배경 지우기 + 여백 자르기 ---------- */
 async function prepareImage(file) {
-  const src = await loadImage(URL.createObjectURL(file));
+  const src = await loadImg(URL.createObjectURL(file));
   const k = Math.min(1, 2000 / Math.max(src.width, src.height));
   const W = Math.round(src.width * k), H = Math.round(src.height * k);
   const cv = document.createElement("canvas");
@@ -119,7 +178,7 @@ async function prepareImage(file) {
 
 // 배경 그림: 배경은 안 지우고 크기만 줄여서 JPG로
 async function prepareArt(file) {
-  const src = await loadImage(URL.createObjectURL(file));
+  const src = await loadImg(URL.createObjectURL(file));
   const k = Math.min(1, 1600 / Math.max(src.width, src.height));
   const cv = document.createElement("canvas");
   cv.width = Math.round(src.width * k); cv.height = Math.round(src.height * k);
@@ -260,7 +319,7 @@ function renderRoster() {
       : `<p class="empty">없음</p>`;
   }
 }
-function pick(c) {
+function pickChar(c) {
   const other = 1 - pickSlot;
   if (sel[other] === c) { sel[other] = sel[pickSlot]; }
   sel[pickSlot] = c;
@@ -279,7 +338,7 @@ $("slots").onclick = (e) => {
 };
 $("rosters").onclick = (e) => {
   const b = e.target.closest(".chip");
-  if (b) pick(ROSTER.find((c) => c.id === b.dataset.id));
+  if (b) pickChar(ROSTER.find((c) => c.id === b.dataset.id));
 };
 $("q").oninput = renderRoster;
 $("q-form").onsubmit = (e) => {
@@ -287,7 +346,7 @@ $("q-form").onsubmit = (e) => {
   const n = norm($("q").value);
   const hits = ROSTER.filter((c) => norm(c.name).includes(n));
   const exact = ROSTER.find((c) => norm(c.name) === n);
-  if (exact || hits.length === 1) pick(exact || hits[0]);
+  if (exact || hits.length === 1) pickChar(exact || hits[0]);
 };
 
 /* ---------- 이미지 칸 · 틀 · 미리보기 ---------- */
@@ -363,7 +422,7 @@ $("file").onchange = async () => {
   $("busy").hidden = false;
   try {
     const { blob, canvas } = kind === "art" ? await prepareArt(file) : await prepareImage(file);
-    const img = await loadImage(URL.createObjectURL(blob));
+    const img = await loadImg(URL.createObjectURL(blob));
     localImg[`${c.id}:${kind}`] = { img, s: 1, v: Date.now() };
     if (apiOk) {
       const r = await fetch(`/api/sd/${c.id}/${kind}`, { method: "PUT", headers: { "content-type": blob.type }, body: blob });
@@ -431,8 +490,11 @@ async function renderPreview() {
   const st = currentStory();
   const people = await Promise.all(sel.map(async (c) => {
     const [photo, full, small, tall, art] = await Promise.all([photoOf(c), fullOf(c), sdOf(c, "small"), sdOf(c, "tall"), sdOf(c, "art")]);
-    return { c, mbti: mbtiFix[c.id] || c.mbti, photo, full, small, tall, art, colors: colorsFor(c, small, tall) };
+    return { c, mbti: c.mbti, photo, full, small, tall, art, colors: colorsFor(c, small, tall) };
   }));
+  // 긴 틀 배경: 왼쪽은 부적, 오른쪽은 하트 속 증명사진
+  const tal = await talismanOf(sel[0], sel[1]);
+  if (tal) { people[0].bg = { img: tal.paper, kind: "paper" }; people[1].bg = { img: tal.heart, kind: "heart" }; }
   const title = titleOf();
   await loadFrameFonts((st ? JSON.stringify(st) : "") + title.name);
   if (token !== previewToken) return;
