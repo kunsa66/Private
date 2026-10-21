@@ -1,6 +1,6 @@
 // 사이트 파일(public/)은 Cloudflare가 그대로 내보내고, /api/ 아래만 이 코드가 처리:
 // - /api/birthdays, /api/hours, /api/mbti: 궁합소에서 친구들이 입력한 생일·태어난 시·MBTI를 KV에 모아 공유
-// - /api/sd: 태풍고 틀 생성기(/pair/)에 올린 SD 이미지
+// - /api/sd: 태풍고 틀 생성기(/pair/)에 올린 SD 이미지·색, /api/pairstyle: 페어명 꾸미기
 const ID_RE = /^[a-z0-9_-]{1,40}$/;
 const BIRTH_RE = /^(2009|2010)-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/; // 2026년 기준 2학년=2009, 1학년=2010
 const HOURS = ["자시", "축시", "인시", "묘시", "진시", "사시", "오시", "미시", "신시", "유시", "술시", "해시"];
@@ -27,16 +27,19 @@ const ROUTES = {
 
 /* 태풍고 틀 생성기(/pair/)의 SD 이미지 저장소
    GET    /api/sd                  → 목록 { id: { small: {v, s}, tall: {v, s} } }  (v: 올린 시각, s: 크기 보정)
-   GET    /api/sd/<id>/<kind>      → PNG (kind: small | tall)
+   GET    /api/sd/<id>/<kind>      → 이미지 (kind: small | tall | art)
    PUT    /api/sd/<id>/<kind>      → PNG 올리기 (브라우저에서 배경 지우고 여백 자른 것)
    POST   /api/sd/<id>/<kind>/scale  { s } → 크기 보정만 저장
    DELETE /api/sd/<id>/<kind>      → 지우기
    POST   /api/sd/<id>/colors      { hair, eye, point } → 틀에 넣을 색 (목록의 colors) */
-const SD_KINDS = ["small", "tall"];
+// small: 작은 SD, tall: 길쭉한 SD (배경 지운 PNG) / art: 긴 틀 배경에 연하게 까는 그림 (PNG·JPG)
+const SD_KINDS = ["small", "tall", "art"];
+const isJpg = (buf) => { if (buf.byteLength < 3) return false; const b = new Uint8Array(buf, 0, 3); return b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff; };
 const SD_MAX = 5 * 1024 * 1024;
 const isPng = (buf) => {
+  if (buf.byteLength < 8) return false;
   const b = new Uint8Array(buf, 0, 8);
-  return b.length === 8 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47;
+  return b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47;
 };
 
 async function handleSd(request, env, parts) {
@@ -72,12 +75,13 @@ async function handleSd(request, env, parts) {
     if (!buf) return json({ error: "없음" }, 404);
     const versioned = new URL(request.url).searchParams.has("v");
     return new Response(buf, {
-      headers: { "content-type": "image/png", "cache-control": versioned ? "public, max-age=31536000, immutable" : "no-store" },
+      headers: { "content-type": isJpg(buf) ? "image/jpeg" : "image/png", "cache-control": versioned ? "public, max-age=31536000, immutable" : "no-store" },
     });
   }
   if (request.method === "PUT" && !extra) {
     const buf = await request.arrayBuffer();
-    if (buf.byteLength > SD_MAX || !isPng(buf)) return json({ error: "PNG 5MB 이하만 가능" }, 400);
+    const okType = isPng(buf) || (kind === "art" && isJpg(buf));
+    if (buf.byteLength > SD_MAX || !okType) return json({ error: "PNG(배경 그림은 JPG도) 5MB 이하만 가능" }, 400);
     await kv.put(key, buf);
     const index = await readIndex();
     const prev = (index[id] && index[id][kind]) || {};
@@ -109,9 +113,32 @@ async function handleSd(request, env, parts) {
   return json({ error: "지원하지 않는 요청" }, 405);
 }
 
+/* 틀 생성기 페어명 꾸미기: 페어마다 이름·글자별 색
+   GET  /api/pairstyle → { "idA|idB": { name, colors: ["#3b7be6", "", ...] } }
+   POST /api/pairstyle { key, name, colors } (둘 다 비우면 지움) */
+const PAIR_KEY_RE = /^[a-z0-9_-]{1,40}\|[a-z0-9_-]{1,40}$/;
+async function handlePairStyle(request, env) {
+  const kv = env.BIRTHDAYS;
+  const readAll = async () => (await kv.get("pair-style", "json")) || {};
+  if (request.method === "GET") return json(await readAll());
+  if (request.method !== "POST") return json({ error: "지원하지 않는 요청" }, 405);
+  let body;
+  try { body = await request.json(); } catch { return json({ error: "잘못된 요청" }, 400); }
+  const key = String(body.key || "");
+  const name = String(body.name || "").trim().slice(0, 12);
+  const colors = Array.isArray(body.colors) ? body.colors.slice(0, 12).map((c) => (/^#[0-9a-f]{6}$/i.test(c) ? c.toLowerCase() : "")) : [];
+  if (!PAIR_KEY_RE.test(key)) return json({ error: "잘못된 값" }, 400);
+  const all = await readAll();
+  if (!name && !colors.some(Boolean)) delete all[key];
+  else all[key] = { name, colors };
+  await kv.put("pair-style", JSON.stringify(all));
+  return json({ saved: true, ...(all[key] || {}) });
+}
+
 export default {
   async fetch(request, env) {
     const path = new URL(request.url).pathname;
+    if (path === "/api/pairstyle") return handlePairStyle(request, env);
     if (path === "/api/sd" || path.startsWith("/api/sd/")) {
       return handleSd(request, env, path.split("/").slice(3).filter(Boolean));
     }

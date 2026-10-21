@@ -6,7 +6,7 @@
 <title>태풍고 틀 생성기</title>
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#F1F2F4">
-<meta name="build" content="2">
+<meta name="build" content="3">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&display=swap" rel="stylesheet">
@@ -41,6 +41,18 @@
       <div id="sd-panels"></div>
       <h2 class="mt">틀</h2>
       <div class="mode" id="mode"></div>
+    </section>
+
+    <section class="paper">
+      <h2>페어명</h2>
+      <input class="pn-input" id="pn-input" maxlength="12" placeholder="" aria-label="페어명">
+      <p class="sub">비워두면 썰에 있는 페어명을 써요. 글자를 누르고 색을 고르세요.</p>
+      <div class="pn-chars" id="pn-chars"></div>
+      <div class="pn-pal" id="pn-pal"></div>
+      <div class="row pn-btns">
+        <button type="button" class="mini ghost" id="pn-all">고른 색을 모든 글자에</button>
+        <button type="button" class="mini ghost" id="pn-reset">처음대로</button>
+      </div>
     </section>
 
     <section class="paper">

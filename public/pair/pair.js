@@ -3,7 +3,7 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]);
 const norm = (s) => String(s || "").replace(/\s+/g, "").toLowerCase();
 const ROSTER = PAIR_ROSTER.map((id) => CHARACTERS.find((c) => c.id === id)).filter(Boolean);
-const KINDS = [["small", "작은 SD"], ["tall", "길쭉한 SD"]];
+const KINDS = [["small", "작은 SD"], ["tall", "길쭉한 SD"], ["art", "배경 그림"]];
 const pairKey = (a, b) => [a.id, b.id].sort().join("|");
 
 let sel = [null, null];
@@ -109,6 +109,19 @@ async function prepareImage(file) {
   o.drawImage(cv, x0, y0, tw, th, 0, 0, out.width, out.height);
   const blob = await new Promise((r) => out.toBlob(r, "image/png"));
   return { blob, canvas: out };
+}
+
+// 배경 그림: 배경은 안 지우고 크기만 줄여서 JPG로
+async function prepareArt(file) {
+  const src = await loadImage(URL.createObjectURL(file));
+  const k = Math.min(1, 1600 / Math.max(src.width, src.height));
+  const cv = document.createElement("canvas");
+  cv.width = Math.round(src.width * k); cv.height = Math.round(src.height * k);
+  const ctx = cv.getContext("2d");
+  ctx.fillStyle = "#fff"; ctx.fillRect(0, 0, cv.width, cv.height);
+  ctx.drawImage(src, 0, 0, cv.width, cv.height);
+  const blob = await new Promise((r) => cv.toBlob(r, "image/jpeg", 0.88));
+  return { blob, canvas: cv };
 }
 
 /* ---------- 색상 팔레트: 머리 · 눈 · 포인트 ----------
@@ -278,16 +291,17 @@ async function renderSdPanels() {
       const f = await sdOf(c, kind);
       return `<div class="sd" data-id="${c.id}" data-kind="${kind}">
         <div class="sd-img">${f ? `<img src="${f.img.src}" alt="">` : `<span>${label}<br>없음</span>`}</div>
-        <div class="sd-label">${label}</div>
+        <div class="sd-label">${label}${kind === "art" ? "<small>선택 · 틀에 연하게</small>" : ""}</div>
         <div class="sd-btns">
           <button type="button" class="mini" data-act="up">${f ? "바꾸기" : "올리기"}</button>
           ${f ? `<button type="button" class="mini ghost" data-act="del">지우기</button>` : ""}
         </div>
-        ${f ? `<label class="sd-scale">크기 <input type="range" min="0.7" max="1.3" step="0.01" value="${f.s || 1}" data-act="scale"></label>` : ""}
+        ${f && kind !== "art" ? `<label class="sd-scale">크기 <input type="range" min="0.7" max="1.3" step="0.01" value="${f.s || 1}" data-act="scale"></label>` : ""}
       </div>`;
     }));
     const [small, tall] = await Promise.all([sdOf(c, "small"), sdOf(c, "tall")]);
     const cols = colorsFor(c, small, tall);
+    lastCols[c.id] = cols;
     const pal = (small || tall)
       ? `<div class="pal"><span class="pal-t">색</span>${[["hair", "머리"], ["eye", "눈"], ["point", "포인트"]].map(([k, l]) =>
           `<button type="button" class="sw" data-id="${c.id}" data-slot="${k}"><i style="background:${esc(cols[k] || "#ddd")}"></i>${l}</button>`).join("")}
@@ -312,7 +326,7 @@ $("sd-panels").addEventListener("click", async (e) => {
   const c = CHARACTERS.find((x) => x.id === box.dataset.id), kind = box.dataset.kind;
   if (btn.dataset.act === "up") { uploadTarget = { c, kind }; $("file").value = ""; $("file").click(); }
   if (btn.dataset.act === "del") {
-    if (!confirm(`${c.name}의 ${kind === "small" ? "작은" : "길쭉한"} SD를 지울까요?`)) return;
+    if (!confirm(`${c.name}의 ${KINDS.find(([k]) => k === kind)[1]}을(를) 지울까요?`)) return;
     delete localImg[`${c.id}:${kind}`];
     if (apiOk) {
       await fetch(`/api/sd/${c.id}/${kind}`, { method: "DELETE" });
@@ -342,11 +356,11 @@ $("file").onchange = async () => {
   const { c, kind } = uploadTarget;
   $("busy").hidden = false;
   try {
-    const { blob, canvas } = await prepareImage(file);
+    const { blob, canvas } = kind === "art" ? await prepareArt(file) : await prepareImage(file);
     const img = await loadImage(URL.createObjectURL(blob));
     localImg[`${c.id}:${kind}`] = { img, s: 1, v: Date.now() };
     if (apiOk) {
-      const r = await fetch(`/api/sd/${c.id}/${kind}`, { method: "PUT", headers: { "content-type": "image/png" }, body: blob });
+      const r = await fetch(`/api/sd/${c.id}/${kind}`, { method: "PUT", headers: { "content-type": blob.type }, body: blob });
       if (r.ok) await loadIndex();
       else alert("서버 저장에 실패했어요. 이번 미리보기에만 쓰여요.");
     }
@@ -360,16 +374,17 @@ $("file").onchange = async () => {
 };
 
 function renderMode(hasTall) {
-  if (!hasTall && mode === "two") mode = "one";
+
   $("mode").innerHTML = `
     <button type="button" data-mode="one" class="${mode === "one" ? "on" : ""}">한 쌍<small>작은 SD</small></button>
-    <button type="button" data-mode="two" class="${mode === "two" ? "on" : ""}" ${hasTall ? "" : "disabled"}>두 쌍<small>작은 + 길쭉한 SD</small></button>`;
+    <button type="button" data-mode="two" class="${mode === "two" ? "on" : ""}">두 쌍<small>길쭉한 SD + 작은 SD</small></button>
+    ${mode === "two" && !hasTall ? `<p class="sub mode-note">길쭉한 SD를 올리면 긴 틀에 크게 서고, 작은 SD는 모서리에 스티커로 붙어요.</p>` : ""}`;
 }
 $("mode").onclick = (e) => {
   const b = e.target.closest("button[data-mode]");
-  if (!b || b.disabled) return;
+  if (!b) return;
   mode = b.dataset.mode;
-  renderMode(true); renderPreview();
+  renderWork();
 };
 
 function currentStory() {
@@ -399,6 +414,7 @@ async function renderWork() {
   const hasTall = (await Promise.all(sel.map((c) => sdOf(c, "tall")))).some(Boolean);
   renderMode(hasTall);
   renderStoryNote();
+  renderPairName();
   renderEdit();
   renderPreview();
 }
@@ -408,12 +424,13 @@ async function renderPreview() {
   const token = ++previewToken;
   const st = currentStory();
   const people = await Promise.all(sel.map(async (c) => {
-    const [photo, small, tall] = await Promise.all([photoOf(c), sdOf(c, "small"), sdOf(c, "tall")]);
-    return { c, mbti: mbtiFix[c.id] || c.mbti, photo, small, tall, colors: colorsFor(c, small, tall) };
+    const [photo, small, tall, art] = await Promise.all([photoOf(c), sdOf(c, "small"), sdOf(c, "tall"), sdOf(c, "art")]);
+    return { c, mbti: mbtiFix[c.id] || c.mbti, photo, small, tall, art, colors: colorsFor(c, small, tall) };
   }));
-  await loadFrameFonts(st ? JSON.stringify(st) : "");
+  const title = titleOf();
+  await loadFrameFonts((st ? JSON.stringify(st) : "") + title.name);
   if (token !== previewToken) return;
-  const cv = drawFrame(document.createElement("canvas"), { mode, people, story: st });
+  const cv = drawFrame(document.createElement("canvas"), { mode, people, story: st, title });
   const blob = await new Promise((r) => cv.toBlob(r, "image/png"));
   if (token !== previewToken) return;
   if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -424,9 +441,81 @@ async function renderPreview() {
   $("save").download = fname;
 }
 
+/* ---------- 페어명 꾸미기: 이름 바꾸기 + 글자마다 색 (서버에 저장) ---------- */
+let pairStyles = {};
+const lastCols = {};   // 이미지 칸에서 계산한 캐릭터 색 (페어명 색 고를 때 같이 보여줌)
+let pnSel = 0;
+const PN_PRESETS = ["#23272F", "#8A919C", "#3B7BE6", "#7DB9F2", "#F59E3B", "#F27BA8", "#F2C94C", "#5BBF8A", "#9B7BE0", "#E5484D"];
+async function loadPairStyles() {
+  try { pairStyles = await (await fetch("/api/pairstyle", { cache: "no-store" })).json(); } catch (e) { pairStyles = {}; }
+}
+function defaultName() {
+  const st = currentStory();
+  return (st && st.name) || `${sel[0].name.slice(-2)} × ${sel[1].name.slice(-2)}`;
+}
+function styleOf() { return pairStyles[pairKey(sel[0], sel[1])] || { name: "", colors: [] }; }
+function titleOf() {
+  const s = styleOf();
+  return { name: s.name || defaultName(), colors: s.colors || [] };
+}
+let styleTimer = null;
+function saveStyle(next) {
+  const key = pairKey(sel[0], sel[1]);
+  pairStyles[key] = next;
+  clearTimeout(styleTimer);
+  if (apiOk) styleTimer = setTimeout(() => fetch("/api/pairstyle", {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ key, ...next }),
+  }).catch(() => {}), 600);
+}
+function renderPairName() {
+  const t = titleOf(), s = styleOf();
+  const chars = [...t.name];
+  if (pnSel >= chars.length) pnSel = 0;
+  const swatches = [...PN_PRESETS];
+  for (const c of sel) {
+    const meta = lastCols[c.id] || {};
+    Object.values(meta).forEach((v) => { if (v && !swatches.includes(v)) swatches.push(v); });
+  }
+  const cur = t.colors[pnSel] || "";
+  if ($("pn-input") !== document.activeElement) $("pn-input").value = s.name || "";
+  $("pn-input").placeholder = defaultName();
+  $("pn-chars").innerHTML = chars.map((ch, i) =>
+    ch.trim() ? `<button type="button" class="pn-ch${i === pnSel ? " on" : ""}" data-i="${i}" style="color:${esc(t.colors[i] || "#23272F")}">${esc(ch)}</button>` : `<span class="pn-gap"></span>`).join("");
+  $("pn-pal").innerHTML = swatches.map((c) => `<button type="button" class="pn-sw${c === cur ? " on" : ""}" data-c="${c}" style="background:${c}" aria-label="${c}"></button>`).join("")
+    + `<label class="pn-custom" aria-label="직접 고르기"><input type="color" id="pn-color" value="${cur || "#23272f"}">＋</label>`;
+}
+function setCharColor(color, all = false) {
+  const t = titleOf(), s = styleOf();
+  const colors = [...t.colors];
+  if (all) [...t.name].forEach((_, i) => { colors[i] = color; });
+  else colors[pnSel] = color;
+  saveStyle({ name: s.name || "", colors });
+  renderPairName(); renderPreview();
+}
+$("pn-input").addEventListener("input", () => {
+  const s = styleOf();
+  saveStyle({ name: $("pn-input").value.trim(), colors: s.colors || [] });
+  renderPairName();
+  clearTimeout(editTimer);
+  editTimer = setTimeout(renderPreview, 250);
+});
+$("pn-chars").onclick = (e) => {
+  const b = e.target.closest(".pn-ch");
+  if (!b) return;
+  pnSel = Number(b.dataset.i);
+  renderPairName();
+};
+$("pn-pal").addEventListener("click", (e) => {
+  const b = e.target.closest(".pn-sw");
+  if (b) setCharColor(b.dataset.c);
+});
+$("pn-pal").addEventListener("change", (e) => { if (e.target.id === "pn-color") setCharColor(e.target.value); });
+$("pn-all").onclick = () => setCharColor(titleOf().colors[pnSel] || "#23272F", true);
+$("pn-reset").onclick = () => { saveStyle({ name: "", colors: [] }); pnSel = 0; renderPairName(); renderPreview(); };
+
 /* ---------- 글자 고치기 (미리보기·저장용, 서버에 저장 안 됨) ---------- */
 const EDIT_FIELDS = (A, B) => [
-  ["name", "페어명"], ["tags", "태그 (띄어쓰기로 구분)"],
+  ["tags", "태그 (띄어쓰기로 구분)"],
   [`lines.${A.id}`, `${A.name} 대사`], [`lines.${B.id}`, `${B.name} 대사`],
   ["parts.meet", "01 첫 만남"], ["parts.some", "02 썸"], ["parts.love", "03 연애"], ["parts.end", "04 헤어짐"],
 ];
@@ -463,11 +552,11 @@ $("reload").onclick = async () => {
   await loadStories();
   edit = null;
   $("reload").textContent = "새 썰 확인";
-  if (sel[0] && sel[1]) { renderStoryNote(); renderEdit(); renderPreview(); }
+  if (sel[0] && sel[1]) { renderStoryNote(); renderEdit(); renderPairName(); renderPreview(); }
 };
 
 /* ---------- 시작 ---------- */
 renderSlots();
 renderRoster();
-Promise.all([loadStories(), loadIndex(), loadMbti()]).then(() => { if (sel[0] && sel[1]) renderWork(); });
+Promise.all([loadStories(), loadIndex(), loadMbti(), loadPairStyles()]).then(() => { if (sel[0] && sel[1]) renderWork(); });
 loadFrameFonts();

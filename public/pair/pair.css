@@ -52,13 +52,13 @@ main { max-width: 760px; margin: 0 auto; padding: 0 14px; }
 
 .sd-person + .sd-person { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
 .sd-person h4 { display: flex; align-items: center; gap: 8px; font-size: 15px; margin-bottom: 10px; }
-.sd-row { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.sd-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .sd { background: var(--bg); border-radius: 16px; padding: 8px; text-align: center; }
 .sd-img {
-  height: 150px; border-radius: 12px; display: grid; place-items: center; overflow: hidden;
+  height: 130px; border-radius: 12px; display: grid; place-items: center; overflow: hidden;
   background: repeating-conic-gradient(#ECEEF1 0 25%, #fff 0 50%) 0 0 / 16px 16px;
 }
-.sd-img img { max-width: 100%; max-height: 140px; object-fit: contain; }
+.sd-img img { max-width: 100%; max-height: 122px; object-fit: contain; }
 .sd-img span { font-size: 12px; color: var(--sub); line-height: 1.5; }
 .sd-label { font-size: 13px; font-weight: 700; margin: 8px 0 6px; color: var(--text); }
 .sd-btns { display: flex; gap: 6px; justify-content: center; }
@@ -109,3 +109,21 @@ main { max-width: 760px; margin: 0 auto; padding: 0 14px; }
 .picker-img canvas { max-width: 100%; max-height: 56vh; touch-action: none; cursor: crosshair; }
 .picker-row { display: flex; align-items: center; gap: 8px; margin-top: 12px; }
 .picker-row .pv { width: 42px; height: 42px; border-radius: 12px; box-shadow: inset 0 0 0 1px rgba(0,0,0,.1); margin-right: auto; }
+.sd { padding: 6px; }
+.sd-label small { display: block; font-size: 11px; font-weight: 500; color: var(--sub); margin-top: 2px; }
+.sd-btns { flex-wrap: wrap; }
+.sd .mini { padding: 5px 10px; font-size: 12px; }
+.mode-note { grid-column: 1 / -1; margin: 4px 0 0; }
+
+.pn-input { width: 100%; font-size: 16px; padding: 11px 14px; border-radius: 14px; border: 1.5px solid var(--line); background: var(--bg); outline: none; margin-bottom: 8px; }
+.pn-input:focus { border-color: var(--blue); background: #fff; }
+.pn-chars { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 6px 0 12px; }
+.pn-ch { font-family: var(--title); font-weight: 400; font-size: 40px; line-height: 1; min-width: 58px; padding: 8px 8px 6px; border-radius: 14px; border: 2px solid transparent; background: var(--bg); }
+.pn-ch.on { border-color: var(--blue); background: #fff; }
+.pn-gap { width: 18px; }
+.pn-pal { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
+.pn-sw { width: 34px; height: 34px; border-radius: 50%; border: none; box-shadow: inset 0 0 0 1px rgba(0,0,0,.08); }
+.pn-sw.on { box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--blue); }
+.pn-custom { position: relative; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--bg); color: var(--sub); font-weight: 700; box-shadow: inset 0 0 0 1.5px var(--line); cursor: pointer; overflow: hidden; }
+.pn-custom input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.pn-btns { display: flex; gap: 8px; justify-content: center; }
