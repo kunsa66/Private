@@ -10,4 +10,4 @@ window.PAIR_ROSTER = [
 ];
 
 /* 프로필 문서에 있던 전신 그림이 있는 사람 (public/full/<id>.jpg) — 긴 틀 배경에 연하게 깔림 */
-window.PAIR_FULL = ["ajin", "baekcheong", "bongchun", "byeonggeon", "chan", "dami", "euiheon", "euljeok", "eunbyeol", "eungyeol", "eunjae", "eunseo", "ganghwi", "geonwoo", "hamin", "inryu", "jaehee", "jeha", "jinho", "jinoh", "jinseong", "jiseo", "jiwoo", "jiyeon", "jiyu", "jiyul", "mihee", "minju", "nagi", "namu", "nuribit", "sangil", "sari", "seonghyeon", "seonmin", "sunwoo", "taegyeong", "taemo", "taeyoung", "uri", "wuhyuk", "wusik", "yeorin", "yuchan", "yuhyun", "yujin", "yuna"];
+window.PAIR_FULL = ["ajin", "baekcheong", "bongchun", "byeonggeon", "chan", "dami", "euiheon", "euljeok", "eunbyeol", "eunchan", "eungyeol", "eunjae", "eunseo", "ganghwi", "geonwoo", "hamin", "inryu", "jaehee", "jeha", "jinho", "jinoh", "jinseong", "jiseo", "jiwoo", "jiyeon", "jiyu", "jiyul", "mihee", "minju", "nagi", "namu", "nuribit", "sangil", "sari", "seonghyeon", "seonmin", "sunwoo", "taegyeong", "taemo", "taeyoung", "uri", "wuhyuk", "wusik", "yeorin", "yuchan", "yuhyun", "yujin", "yuna"];

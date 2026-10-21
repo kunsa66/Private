@@ -14,16 +14,16 @@
 const FW = 2000, FH = 1420;
 const FC = {
   bg: "#F1F2F4", card: "#FFFFFF", line: "#DDE1E7", ink: "#23272F", text: "#3A404B", sub: "#8A919C",
-  blue: "#3B7BE6", blueSoft: "#E3EDFC", tint: "rgba(227,237,252,.35)", empty: "#D9DEE6",
+  blue: "#3B7BE6", blueSoft: "#E3EDFC", tint: "rgba(227,237,252,.35)", empty: "#D9DEE6", cream: "#FFF7DF", frame: "#A9C2EE",
 };
 const FF = {
   title: '"Black Han Sans", sans-serif',
   body: '"Pretendard Variable", Pretendard, sans-serif',
   // 썰 카드 손글씨: 남자애는 펜글씨, 여자애는 동글동글
-  handBoy: '"Nanum Pen Script", cursive',
-  handGirl: '"Gamja Flower", cursive',
+  handBoy: '"나눔손글씨 규리의 일기", "Nanum Pen Script", cursive',
+  handGirl: '"나눔손글씨 바른히피", "Gamja Flower", cursive',
 };
-const PARTS = [["meet", "첫 만남"], ["some", "썸"], ["love", "연애"], ["end", "헤어짐"]];
+const PARTS = [["meet", "첫 만남"], ["some", "썸?"], ["love", "연애 중"], ["end", "헤어짐"]];
 const COLOR_SLOTS = [["hair", "머리"], ["eye", "눈"], ["point", "포인트"]];
 const PANEL = { w: 516, h: 1268, y: 76, inset: 84 };
 
@@ -257,7 +257,7 @@ function drawPanel(ctx, P, side, mode, story) {
   const x = left ? PANEL.inset : FW - PANEL.inset - w;
   // 틀
   ctx.save();
-  softShadow(ctx, 26, 8, 0.08);
+  softShadow(ctx, 34, 12, 0.16);
   ctx.fillStyle = FC.card;
   rrect(ctx, x, y, w, h, 44); ctx.fill();
   noShadow(ctx);
@@ -267,33 +267,45 @@ function drawPanel(ctx, P, side, mode, story) {
   // 배경: 직접 올린 그림 → 프로필 문서 전신 → 두상
   // 크게 확대하고 살짝 기울여서 틀을 빈틈없이 채움 (머리·상반신이 보이게)
   const bg = P.bg ? null : (P.art && P.art.img) || P.full || P.photo;
-  if (P.bg && P.bg.kind === "paper") {
-    // 부적: 틀 폭보다 살짝 크게, 세로 가운데
-    const im = P.bg.img, k = (w * 1.1) / im.width;
-    ctx.globalAlpha = 0.42;
-    ctx.drawImage(im, x + w / 2 - (im.width * k) / 2, y + h / 2 - (im.height * k) / 2, im.width * k, im.height * k);
-    ctx.globalAlpha = 1;
-  } else if (P.bg && P.bg.kind === "heart") {
-    // 하트 속 증명사진: SD 머리 위쪽에 보이게
-    const im = P.bg.img, k = (w * 0.82) / im.width;
-    ctx.globalAlpha = 0.62;
-    ctx.drawImage(im, x + w / 2 - (im.width * k) / 2, y + 140, im.width * k, im.height * k);
-    ctx.globalAlpha = 1;
-  }
-  if (bg) {
-    const tilt = left ? -0.13 : 0.13, c = Math.cos(tilt), s = Math.sin(tilt);
-    const cover = Math.max((w * c + h * s) / bg.width, (w * s + h * c) / bg.height);
-    const k = cover * (P.art || P.full ? 1.45 : 1.15);
-    ctx.globalAlpha = P.art || P.full ? 0.3 : 0.2;
+  if (P.bg) {
+    // 부적 배경: 연한 노랑 바탕 + 크게 키워서 기울인 부적 (잘려도 괜찮음)
+    ctx.fillStyle = FC.cream; ctx.fillRect(x, y, w, h);
+    const im = P.bg.img;
+    const tilt = left ? -0.11 : 0.1;
     ctx.translate(x + w / 2, y + h / 2); ctx.rotate(tilt);
-    // 그림 윗부분(얼굴 쪽)이 틀 가운데 위로 오게 아래로 밀어서 그림
-    ctx.drawImage(bg, -bg.width * k / 2, -h * c / 2 - bg.height * k * 0.04, bg.width * k, bg.height * k);
+    if (P.bg.kind === "paper") {
+      // 한자 줄이 이름 아래(틀 위에서 300px쯤)에 오게, 하트 틀은 가운데
+      const k = (w * 1.38) / im.width;
+      ctx.globalAlpha = 0.42;
+      ctx.drawImage(im, (-im.width * k) / 2, 270 - h / 2 - 248 * k, im.width * k, im.height * k);
+    } else {
+      // 증명사진 두 장을 틀 위쪽에 가득
+      const k = (w * 1.42) / im.width;
+      ctx.globalAlpha = 0.62;
+      ctx.drawImage(im, (-im.width * k) / 2, 150 - h / 2, im.width * k, im.height * k);
+    }
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
   }
-  ctx.fillStyle = FC.tint; ctx.fillRect(x, y, w, h);
+  if (bg) {
+    // 전신 그림(없으면 두상): 살짝 기울여도 틀이 빈틈없이 그림으로 꽉 차게 키움
+    // bgfit = { z: 확대(1 = 딱 꽉 참), x·y: 틀 크기 대비 이동, r: 기울기 } — 사이트에서 직접 맞출 수 있음
+    // 기본 위치: 그림 윗변이 이름 아래(틀 위에서 TOP)에서 시작 → 얼굴이 이름에 안 가림.
+    // 가로는 틀보다 넓게 꽉, 세로는 틀 아래까지 꽉 차는 크기
+    const fit = P.bgfit || {};
+    const TOP = 240;
+    const r = fit.r != null ? fit.r : left ? -0.1 : 0.1;
+    const k = Math.max((w * 1.18) / bg.width, (h - TOP + 80) / bg.height) * (fit.z || 1);
+    const iw = bg.width * k, ih = bg.height * k;
+    ctx.globalAlpha = P.art || P.full ? 0.32 : 0.26;
+    ctx.translate(x + w / 2 + (fit.x || 0) * w, y + TOP + (fit.y || 0) * h + ih / 2); ctx.rotate(r);
+    ctx.drawImage(bg, -iw / 2, -ih / 2, iw, ih);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.globalAlpha = 1;
+  }
+  if (!P.bg) { ctx.fillStyle = FC.tint; ctx.fillRect(x, y, w, h); }
   ctx.restore();
-  ctx.lineWidth = 3; ctx.strokeStyle = FC.line;
+  ctx.lineWidth = 4; ctx.strokeStyle = FC.frame;
   rrect(ctx, x, y, w, h, 44); ctx.stroke();
   ctx.restore();
 
@@ -394,7 +406,7 @@ function paperPath(ctx, w, h, torn, rand) {
   }
   ctx.closePath();
 }
-function paperPattern(ctx, w, h, kind) {
+function paperPattern(ctx, w, h, kind, lh = 37, start = 150) {
   if (kind === "grid") {
     ctx.strokeStyle = "rgba(120,135,160,.13)"; ctx.lineWidth = 1.5;
     for (let x = 18; x < w; x += 28) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
@@ -405,7 +417,7 @@ function paperPattern(ctx, w, h, kind) {
   } else {
     // 줄 노트: 글씨 줄에 맞춘 가로줄 + 왼쪽 여백선
     ctx.strokeStyle = "rgba(59,123,230,.16)"; ctx.lineWidth = 2;
-    for (let y = 150; y < h - 6; y += 37) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
+    for (let y = start; y < h - 6; y += lh) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
     ctx.strokeStyle = "rgba(59,123,230,.24)";
     ctx.beginPath(); ctx.moveTo(18, 0); ctx.lineTo(18, h); ctx.stroke();
   }
@@ -442,11 +454,20 @@ function drawTape(ctx, cx, cy, w, rot, style) {
   ctx.restore();
 }
 // 교환일기처럼: 01·03은 A가, 02·04는 B가 쓴 손글씨
-// 다꾸처럼 크기·기울기·위치를 제각각 (페어마다 배치 세 가지 중 하나 + 조금씩 흔들기)
+// 다꾸 배치: 양옆 캐릭터 틀 밑으로 살짝 파고들게, 좌우 칸 높이는 엇갈리게 (페어마다 어느 쪽이 높은지만 바뀜)
+// [x(가운데 영역 왼쪽 기준), y, w, h, 기울기]
 const CARD_LAYOUTS = [
-  [[0, 312, 350, 470, -0.06], [380, 360, 340, 440, 0.05], [20, 820, 340, 470, 0.04], [370, 845, 350, 470, -0.05]],
-  [[10, 330, 340, 450, 0.05], [375, 300, 345, 470, -0.04], [-5, 845, 350, 470, -0.03], [385, 820, 335, 480, 0.06]],
-  [[0, 320, 360, 455, -0.035], [395, 345, 325, 455, 0.07], [30, 830, 330, 480, 0.06], [375, 860, 345, 455, -0.06]],
+  [[-84, 292, 420, 540, -0.06], [350, 318, 410, 520, 0.05], [-74, 872, 410, 510, 0.045], [348, 890, 420, 490, -0.055]],
+  [[-84, 318, 420, 520, 0.05], [350, 292, 410, 540, -0.06], [-74, 890, 410, 490, -0.055], [348, 872, 420, 510, 0.045]],
+];
+// 틀 밑에 들어가는 쪽은 글씨를 안쪽으로 (왼쪽 칸은 왼쪽 여백, 오른쪽 칸은 오른쪽 여백을 넉넉히)
+const CARD_PAD = [[92, 40], [40, 70], [92, 40], [40, 70]];
+// 카드별 종이와 테이프 (top: 위 가운데, tl/tr: 위 모서리, br/bl: 아래 모서리)
+const CARD_STYLE = [
+  { paper: "lined", tapes: [["top", "stripe"]] },
+  { paper: "sticky", tapes: [] },
+  { paper: "grid", tapes: [["tl", "gray"], ["tr", "gray"]] },
+  { paper: "dot", tapes: [["top", "plain"], ["br", "white"]] },
 ];
 function drawSticky(p, w, h) {
   p.fillStyle = "#E3EDFC"; p.fillRect(0, 0, w, h);
@@ -459,15 +480,41 @@ function drawCards(ctx, story, seedKey, writers) {
   const rand = seeded(strHash(seedKey));
   const cx0 = PANEL.inset + PANEL.w + 40;
   const layout = CARD_LAYOUTS[Math.floor(rand() * CARD_LAYOUTS.length)];
-  const papers = ["lined", "grid", "sticky", "dot"].sort(() => rand() - 0.5);
-  const tapes = ["stripe", "gray", "plain", "white"].sort(() => rand() - 0.5);
+  const flip = layout === CARD_LAYOUTS[1];
   const placed = [];
   PARTS.forEach(([key, label], i) => {
     const text = story && story.parts ? story.parts[key] : "";
     const [dx, dy, w, h, r0] = layout[i];
-    const rot = r0 + (rand() - 0.5) * 0.02;
-    const x = cx0 + dx + (rand() - 0.5) * 12, y = dy + (rand() - 0.5) * 12;
-    const kind = papers[i];
+    const [pl, pr] = CARD_PAD[i];
+    const rot = r0;
+    const x = cx0 + dx, y = dy;
+    // 좌우 반전 배치면 위 두 장의 종이도 서로 바꿔서, 포스트잇은 늘 짧은 칸에
+    const style = CARD_STYLE[flip && i < 2 ? 1 - i : i];
+    const kind = style.paper;
+    // 본문 글씨: 썰에 화자(narrator)가 있으면 네 장 모두 그 사람 손글씨, 없으면 A·B 번갈아
+    // 글이 길면 글씨를 줄여서 맞추고, 줄 노트의 줄 간격도 글씨에 맞춤
+    let body = null;
+    if (text) {
+      const narrator = story.narrator && writers ? writers.find((c) => c.id === story.narrator) : null;
+      const who = narrator || (writers ? writers[i % 2] : null);
+      const girl = who && who.gender === "여";
+      const font = girl ? FF.handGirl : FF.handBoy;
+      const sizes = girl ? [30, 29, 28, 27, 26, 25, 24, 23, 22, 21] : [34, 33, 32, 31, 30, 29, 28, 27, 26, 25, 24, 23, 22];
+      for (const size of sizes) {
+        const lh = Math.round(size * 1.08 + 3);
+        const maxLines = Math.floor((h - 150) / lh) + 1;
+        ctx.font = `400 ${size}px ${font}`;
+        const lines = wrap(ctx, text, w - pl - pr);
+        body = { font, size, lh, lines };
+        if (lines.length <= maxLines) break;
+      }
+      // 제일 작게 해도 넘치면 마지막 줄을 … 으로
+      const maxL = Math.floor((h - 150) / body.lh) + 1;
+      if (body.lines.length > maxL) {
+        body.lines = body.lines.slice(0, maxL);
+        body.lines[maxL - 1] = body.lines[maxL - 1].replace(/.$/, "…");
+      }
+    }
     ctx.save();
     ctx.translate(x + w / 2, y + h / 2); ctx.rotate(rot); ctx.translate(-w / 2, -h / 2);
     const paper = document.createElement("canvas");
@@ -478,7 +525,7 @@ function drawCards(ctx, story, seedKey, writers) {
       const torn = rand() < 0.5 ? "top" : "bottom";
       paperPath(p, w, h, torn, rand);
       p.fillStyle = i % 2 ? "#FDFDFB" : "#FFFFFF"; p.fill();
-      p.save(); p.clip(); paperPattern(p, w, h, kind); p.restore();
+      p.save(); p.clip(); paperPattern(p, w, h, kind, body ? body.lh : 37, body ? 143 + 8 : 150); p.restore();
       if (torn === "bottom" && rand() < 0.6) punchHoles(p, w);
     }
     softShadow(ctx, 14, 5, 0.1);
@@ -486,58 +533,53 @@ function drawCards(ctx, story, seedKey, writers) {
     noShadow(ctx);
     // 제목: 숫자 + 형광펜 그은 제목
     ctx.font = `44px ${FF.title}`; ctx.textAlign = "left"; ctx.fillStyle = FC.blue;
-    ctx.fillText(`0${i + 1}`, 36, 90);
+    ctx.fillText(`0${i + 1}`, pl, 90);
     const nw = ctx.measureText(`0${i + 1}`).width;
     ctx.font = `38px ${FF.title}`;
     const lw = ctx.measureText(label).width;
     ctx.fillStyle = kind === "sticky" ? "rgba(255,255,255,.8)" : "rgba(150,186,240,.45)";
-    ctx.fillRect(36 + nw + 12, 72, lw + 10, 18);
+    ctx.fillRect(pl + nw + 12, 72, lw + 10, 18);
     ctx.fillStyle = FC.ink;
-    ctx.fillText(label, 36 + nw + 16, 88);
+    ctx.fillText(label, pl + nw + 16, 88);
     // 본문: 손글씨 (줄 노트면 줄에 맞춤)
-    if (text) {
-      const who = writers ? writers[i % 2] : null;
-      const girl = who && who.gender === "여";
-      const font = girl ? FF.handGirl : FF.handBoy;
-      const sizes = girl ? [30, 29, 28, 27, 26] : [35, 34, 33, 32, 31];
-      const maxLines = Math.floor((h - 168) / 37) + 1;
-      const { lines, size } = fitText(ctx, text, w - 72, maxLines, (z) => `400 ${z}px ${font}`, sizes);
-      ctx.font = `400 ${size}px ${font}`; ctx.fillStyle = FC.text;
-      lines.forEach((l, k) => ctx.fillText(l, 38, 143 + k * 37));
+    if (body) {
+      ctx.font = `400 ${body.size}px ${body.font}`; ctx.fillStyle = FC.text;
+      body.lines.forEach((l, k) => ctx.fillText(l, pl + 2, 143 + k * body.lh));
     } else {
       ctx.font = `600 26px ${FF.body}`; ctx.fillStyle = FC.sub; ctx.textAlign = "center";
-      ctx.fillText("아직 썰이 없어요", w / 2, h / 2 + 30);
+      ctx.fillText("아직 썰이 없어요", (w + pl - pr) / 2, h / 2 + 30);
     }
     ctx.restore();
-    placed.push({ x, y, w, h, sticky: kind === "sticky" });
+    placed.push({ x, y, w, h, rot, style });
   });
-  // 테이프: 위에 하나(가끔 양쪽 모서리), 아래 모서리에도 엇갈리게. 포스트잇은 테이프 없이
-  placed.forEach(({ x, y, w, h, sticky }, i) => {
-    if (sticky) return;
-    if (rand() < 0.35) {
-      drawTape(ctx, x + 22, y + 12, 110, -0.7 + rand() * 0.2, tapes[i]);
-      drawTape(ctx, x + w - 22, y + 12, 110, 0.7 - rand() * 0.2, tapes[i]);
-    } else {
-      drawTape(ctx, x + w / 2 + (rand() - 0.5) * 90, y + 4, 140 + rand() * 30, (rand() - 0.5) * 0.35, tapes[i]);
-    }
-    if (i === 1 || i === 2 || rand() < 0.3) {
-      const right = i % 2 === 0;
-      drawTape(ctx, right ? x + w - 18 : x + 18, y + h - 10, 104, right ? -0.72 : 0.72, tapes[(i + 2) % 4]);
+  // 테이프: 카드마다 정해진 자리에만 (포스트잇은 없음)
+  placed.forEach(({ x, y, w, h, rot, style }) => {
+    const cx = x + w / 2, cy = y + h / 2, c = Math.cos(rot), s = Math.sin(rot);
+    const pt = (px, py) => [cx + px * c - py * s, cy + px * s + py * c];
+    for (const [where, kind] of style.tapes) {
+      if (where === "top") { const [tx, ty] = pt(0, -h / 2 + 2); drawTape(ctx, tx, ty, 150, rot - 0.05, kind); }
+      if (where === "tl") { const [tx, ty] = pt(-w / 2 + 20, -h / 2 + 14); drawTape(ctx, tx, ty, 110, rot - 0.72, kind); }
+      if (where === "tr") { const [tx, ty] = pt(w / 2 - 20, -h / 2 + 14); drawTape(ctx, tx, ty, 110, rot + 0.72, kind); }
+      if (where === "br") { const [tx, ty] = pt(w / 2 - 18, h / 2 - 12); drawTape(ctx, tx, ty, 104, rot - 0.72, kind); }
+      if (where === "bl") { const [tx, ty] = pt(-w / 2 + 18, h / 2 - 12); drawTape(ctx, tx, ty, 104, rot + 0.72, kind); }
     }
   });
+  // 작은 스티커 (하트 · 별)
+  const [c2, c3] = [placed[1], placed[2]];
+  heartSticker(ctx, c3.x + c3.w - 30, c3.y + 34, 26, 0.22);
+  drawStar(ctx, c2.x + 26, c2.y + c2.h - 26, 22, -0.3, "#fff", FC.ink);
 }
 
 /* ---------- 가장자리 꾸미기: 테이프 · 별 · 반짝이 ---------- */
 function drawDeco(ctx) {
-  const L = PANEL.inset, R = FW - PANEL.inset, T = PANEL.y, Bt = PANEL.y + PANEL.h;
-  // 긴 틀 테이프: 대각선으로 엇갈리게 (A는 왼쪽 위·오른쪽 아래, B는 오른쪽 위·왼쪽 아래)
-  drawTape(ctx, L + 22, T + 18, 150, -0.72, "stripe");
-  drawTape(ctx, L + PANEL.w - 24, Bt - 16, 140, -0.72, "gray");
-  drawTape(ctx, R - 22, T + 18, 150, 0.72, "gray");
-  drawTape(ctx, R - PANEL.w + 24, Bt - 16, 140, 0.72, "stripe");
-  // 별
+  const L = PANEL.inset, R = FW - PANEL.inset, T = PANEL.y;
+  // 긴 틀 꾸밈은 별 스티커만 (테이프 없이)
   drawStar(ctx, L + PANEL.w - 12, T + 18, 34, 0.25, FC.blue, FC.ink);
   drawStar(ctx, R - PANEL.w + 14, T + 22, 24, -0.2, "#fff", FC.ink);
+  drawStar(ctx, R + 6, 1010, 28, 0.3, "#fff", FC.ink);
+  drawStar(ctx, R - 22, 1082, 17, -0.15, FC.blue, FC.ink);
+  drawStar(ctx, L - 6, 900, 28, -0.3, "#fff", FC.ink);
+  drawStar(ctx, L + 22, 972, 17, 0.15, FC.blue, FC.ink);
   // 반짝이
   sparkle(ctx, L + PANEL.w + 20, 842, 16, FC.blue);
   sparkle(ctx, R - PANEL.w - 18, 318, 13, FC.blue);
@@ -557,7 +599,7 @@ function propNotebook(ctx, w, h, rand, kind = "lined") {
   ctx.moveTo(-w / 2, -h / 2); ctx.lineTo(w / 2, -h / 2); ctx.lineTo(w / 2, h / 2);
   for (let x = w / 2; x > -w / 2; x -= 10 + rand() * 8) ctx.lineTo(x, h / 2 - rand() * 12);
   ctx.lineTo(-w / 2, h / 2); ctx.closePath();
-  ctx.fillStyle = "#FDFDFC"; ctx.fill();
+  ctx.fillStyle = "#F5F6F8"; ctx.fill();
   noShadow(ctx);
   ctx.save(); ctx.clip();
   if (kind === "grid") {
@@ -598,12 +640,11 @@ function propPhone(ctx) {
 }
 function drawBackdrop(ctx, seedKey) {
   const rand = seeded(strHash(seedKey + "#bg"));
-  // 종이 몇 장 + 폰 하나만 (가장자리로 살짝 삐져나오게)
-  at(ctx, 120, 210, -0.22, 0.9, () => propNotebook(ctx, 460, 600, rand, "lined"));     // 왼쪽 위
-  at(ctx, 1880, 150, 0.28, 0.85, () => propNotebook(ctx, 420, 520, rand, "grid"));     // 오른쪽 위
-  at(ctx, 1000, 1470, -0.05, 0.85, () => propNotebook(ctx, 640, 300, rand, "grid"));   // 아래 가운데
-  at(ctx, 80, 1290, 0.2, 0.85, () => propNotebook(ctx, 380, 480, rand, "lined"));      // 왼쪽 아래
-  at(ctx, 1935, 1240, -0.32, 0.85, () => propPhone(ctx));                              // 오른쪽 아래
+  // 비대칭: 왼쪽 위에 종이 두 장 겹쳐서, 오른쪽 아래에 폰 + 쪽지 하나 (대각선으로 균형)
+  at(ctx, 420, 40, 0.12, 0.7, () => propNotebook(ctx, 440, 340, rand, "grid"));
+  at(ctx, 150, 200, -0.2, 0.75, () => propNotebook(ctx, 520, 680, rand, "lined"));
+  at(ctx, 1760, 1400, 0.16, 0.7, () => propNotebook(ctx, 400, 280, rand, "lined"));
+  at(ctx, 1925, 1215, -0.3, 0.88, () => propPhone(ctx));
 }
 
 /* ---------- 전체 ---------- */
@@ -642,4 +683,20 @@ function loadFrameFonts(text = "") {
     document.fonts.load(`400 32px ${FF.handBoy}`, sample),
     document.fonts.load(`400 28px ${FF.handGirl}`, sample),
   ]).catch(() => {});
+}
+
+// 하트 스티커: 흰 테두리 + 파란 하트 + 먹선
+function heartSticker(ctx, cx, cy, r, rot) {
+  ctx.save();
+  ctx.translate(cx, cy); ctx.rotate(rot);
+  ctx.beginPath();
+  ctx.moveTo(0, r * 0.95);
+  ctx.bezierCurveTo(-r * 1.6, -r * 0.1, -r * 0.7, -r * 1.25, 0, -r * 0.45);
+  ctx.bezierCurveTo(r * 0.7, -r * 1.25, r * 1.6, -r * 0.1, 0, r * 0.95);
+  ctx.closePath();
+  ctx.lineJoin = "round";
+  ctx.lineWidth = 10; ctx.strokeStyle = "#fff"; ctx.stroke();
+  ctx.fillStyle = FC.blue; ctx.fill();
+  ctx.lineWidth = 3.5; ctx.strokeStyle = FC.ink; ctx.stroke();
+  ctx.restore();
 }

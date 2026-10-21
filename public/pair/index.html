@@ -6,11 +6,14 @@
 <title>태풍고 틀 생성기</title>
 <meta name="robots" content="noindex">
 <meta name="theme-color" content="#F1F2F4">
-<meta name="build" content="6">
+<meta name="build" content="8">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Gamja+Flower&family=Hahmlet:wght@700;800&family=Nanum+Pen+Script&family=Noto+Serif+TC:wght@700;900&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" rel="stylesheet">
+<!-- 썰 카드 손글씨: 남자애 = 나눔손글씨 규리의 일기, 여자애 = 나눔손글씨 바른히피 (OFL) -->
+<link href="https://cdn.jsdelivr.net/npm/@kfonts/nanum-handwritting-gyuli-ui-ilgi@0.2.0/index.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/@kfonts/nanum-handwritting-baleunhipi@0.2.0/index.css" rel="stylesheet">
 <link rel="stylesheet" href="pair.css">
 </head>
 <body>
@@ -62,9 +65,13 @@
         <button type="button" class="btn ghost" id="reload">새 썰 확인</button>
       </div>
       <details class="edit" id="edit-box">
-        <summary>✎ 글자 고치기 <small>(이번 저장에만 적용)</small></summary>
+        <summary>✎ 썰 직접 고치기 <small>(저장하면 계속 남아요)</small></summary>
         <div id="edit-fields"></div>
-        <button type="button" class="mini ghost" id="edit-reset">원래대로</button>
+        <div class="edit-btns">
+          <button type="button" class="btn" id="edit-save">저장</button>
+          <button type="button" class="mini ghost" id="edit-reset">원래대로</button>
+          <span class="sub" id="edit-msg"></span>
+        </div>
       </details>
     </section>
 
@@ -73,6 +80,9 @@
       <img id="preview" alt="페어 틀 미리보기">
       <p class="sub center">폰은 이미지를 꾹 눌러 저장해도 돼요</p>
       <a class="btn wide" id="save" href="#" download>PNG 저장</a>
+      <h2 class="mt">배경 맞추기</h2>
+      <p class="sub">긴 틀 뒤 전신 그림의 확대·위치·기울기. 움직이면 위 미리보기가 바로 바뀌고, 캐릭터마다 저장돼요.</p>
+      <div id="fit-panels"></div>
     </section>
   </div>
 </main>

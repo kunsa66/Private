@@ -1,6 +1,6 @@
 // 사이트 파일(public/)은 Cloudflare가 그대로 내보내고, /api/ 아래만 이 코드가 처리:
 // - /api/birthdays, /api/hours, /api/mbti: 궁합소에서 친구들이 입력한 생일·태어난 시·MBTI를 KV에 모아 공유
-// - /api/sd: 태풍고 틀 생성기(/pair/)에 올린 SD 이미지·색, /api/pairstyle: 페어명 꾸미기
+// - /api/sd: 태풍고 틀 생성기(/pair/)에 올린 SD 이미지·색, /api/pairstyle: 페어명 꾸미기, /api/storyedit: 직접 고친 썰
 const ID_RE = /^[a-z0-9_-]{1,40}$/;
 const BIRTH_RE = /^(2009|2010)-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/; // 2026년 기준 2학년=2009, 1학년=2010
 const HOURS = ["자시", "축시", "인시", "묘시", "진시", "사시", "오시", "미시", "신시", "유시", "술시", "해시"];
@@ -31,7 +31,8 @@ const ROUTES = {
    PUT    /api/sd/<id>/<kind>      → PNG 올리기 (브라우저에서 배경 지우고 여백 자른 것)
    POST   /api/sd/<id>/<kind>/scale  { s } → 크기 보정만 저장
    DELETE /api/sd/<id>/<kind>      → 지우기
-   POST   /api/sd/<id>/colors      { hair, eye, point } → 틀에 넣을 색 (목록의 colors) */
+   POST   /api/sd/<id>/colors      { hair, eye, point } → 틀에 넣을 색 (목록의 colors)
+   POST   /api/sd/<id>/bgfit       { z, x, y, r } → 긴 틀 배경 그림 확대·위치·기울기 (목록의 bgfit) */
 // small: 작은 SD, tall: 길쭉한 SD (배경 지운 PNG) / art: 긴 틀 배경에 연하게 까는 그림 (PNG·JPG)
 const SD_KINDS = ["small", "tall", "art"];
 const isJpg = (buf) => { if (buf.byteLength < 3) return false; const b = new Uint8Array(buf, 0, 3); return b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff; };
@@ -66,6 +67,24 @@ async function handleSd(request, env, parts) {
     if (!Object.keys(index[id]).length) delete index[id];
     await kv.put("sd-index", JSON.stringify(index));
     return json({ saved: true, colors });
+  }
+  // 긴 틀 배경 그림 맞추기: POST /api/sd/<id>/bgfit { z: 확대, x: 좌우, y: 위아래, r: 기울기(라디안) }
+  if (ID_RE.test(id || "") && kind === "bgfit" && request.method === "POST") {
+    let body;
+    try { body = await request.json(); } catch { return json({ error: "잘못된 요청" }, 400); }
+    const z = Number(body.z), x = Number(body.x), y = Number(body.y), r = Number(body.r);
+    if (!(z >= 0.5 && z <= 3) || !(Math.abs(x) <= 1) || !(Math.abs(y) <= 1) || !(Math.abs(r) <= 0.6)) return json({ error: "잘못된 값" }, 400);
+    const round = (v) => Math.round(v * 1000) / 1000;
+    const index = await readIndex();
+    index[id] = { ...(index[id] || {}), bgfit: { z: round(z), x: round(x), y: round(y), r: round(r) } };
+    await kv.put("sd-index", JSON.stringify(index));
+    return json({ saved: true, bgfit: index[id].bgfit });
+  }
+  if (ID_RE.test(id || "") && kind === "bgfit" && request.method === "DELETE") {
+    const index = await readIndex();
+    if (index[id]) { delete index[id].bgfit; if (!Object.keys(index[id]).length) delete index[id]; }
+    await kv.put("sd-index", JSON.stringify(index));
+    return json({ deleted: true });
   }
   if (!ID_RE.test(id || "") || !SD_KINDS.includes(kind)) return json({ error: "잘못된 주소" }, 400);
   const key = `sd:${id}:${kind}`;
@@ -135,10 +154,44 @@ async function handlePairStyle(request, env) {
   return json({ saved: true, ...(all[key] || {}) });
 }
 
+/* 틀 생성기 썰 직접 고치기: 사용자가 사이트에서 고친 썰 (stories.json 위에 덮어씀)
+   GET  /api/storyedit → { "idA|idB": { story, base, at } }  (base: 고칠 때 원본 썰의 버전 — 원본이 바뀌면 사이트가 무시)
+   POST /api/storyedit { key, story, base } / story가 null이면 지움 */
+const cleanText = (v, max) => String(v == null ? "" : v).slice(0, max);
+async function handleStoryEdit(request, env) {
+  const kv = env.BIRTHDAYS;
+  const readAll = async () => (await kv.get("story-edit", "json")) || {};
+  if (request.method === "GET") return json(await readAll());
+  if (request.method !== "POST") return json({ error: "지원하지 않는 요청" }, 405);
+  let body;
+  try { body = await request.json(); } catch { return json({ error: "잘못된 요청" }, 400); }
+  const key = String(body.key || "");
+  if (!PAIR_KEY_RE.test(key)) return json({ error: "잘못된 값" }, 400);
+  const all = await readAll();
+  if (body.story == null) {
+    delete all[key];
+  } else {
+    const s = body.story, ids = key.split("|");
+    const pick = (o, max) => Object.fromEntries(ids.map((id) => [id, cleanText(o && o[id], max)]));
+    all[key] = {
+      story: {
+        tags: (Array.isArray(s.tags) ? s.tags : []).slice(0, 4).map((t) => cleanText(t, 20)),
+        lines: pick(s.lines, 40),
+        parts: Object.fromEntries(["meet", "some", "love", "end"].map((p) => [p, cleanText(s.parts && s.parts[p], 400)])),
+      },
+      base: cleanText(body.base, 40),
+      at: new Date().toISOString(),
+    };
+  }
+  await kv.put("story-edit", JSON.stringify(all));
+  return json({ saved: true, ...(all[key] || {}) });
+}
+
 export default {
   async fetch(request, env) {
     const path = new URL(request.url).pathname;
     if (path === "/api/pairstyle") return handlePairStyle(request, env);
+    if (path === "/api/storyedit") return handleStoryEdit(request, env);
     if (path === "/api/sd" || path.startsWith("/api/sd/")) {
       return handleSd(request, env, path.split("/").slice(3).filter(Boolean));
     }

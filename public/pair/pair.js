@@ -3,7 +3,7 @@ const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[ch]);
 const norm = (s) => String(s || "").replace(/\s+/g, "").toLowerCase();
 const ROSTER = PAIR_ROSTER.map((id) => CHARACTERS.find((c) => c.id === id)).filter(Boolean);
-const KINDS = [["small", "작은 SD"], ["tall", "길쭉한 SD"]];
+const KINDS = [["small", "작은 SD"], ["tall", "길쭉한 SD"], ["art", "배경 그림"]];
 const pairKey = (a, b) => [a.id, b.id].sort().join("|");
 
 let sel = [null, null];
@@ -19,11 +19,13 @@ let apiOk = true;
 let edit = null;            // 글자 고치기 중인 썰 (저장 안 됨)
 
 /* ---------- 불러오기 ---------- */
+let storyEdits = {};
 async function loadStories() {
   try {
     const r = await fetch(`stories.json?t=${Date.now()}`, { cache: "no-store" });
     stories = await r.json();
   } catch (e) { stories = {}; }
+  try { storyEdits = await (await fetch("/api/storyedit", { cache: "no-store" })).json(); } catch (e) { storyEdits = {}; }
 }
 async function loadIndex() {
   try {
@@ -46,7 +48,7 @@ async function loadMbti() {
   CHARACTERS.forEach((c) => (c.pillars = c.birth ? getPillars(c.birth, c.hour) : null));
 }
 
-/* ---------- 긴 틀 배경: 궁합소 부적 (왼쪽 = 부적 틀, 오른쪽 = 하트 속 증명사진) ---------- */
+/* ---------- 궁합소 부적 이미지 (지금은 안 씀: 사용자가 전신 배경으로 되돌림, 다시 쓸 수 있게 남겨둠) ---------- */
 const talismanCache = {};
 function talismanOf(A, B) {
   const key = `${A.id}|${B.id}`;
@@ -55,44 +57,49 @@ function talismanOf(A, B) {
     const r = compat(A, B);
     const info = reading("pair", A, r);
     const kind = r.total >= 50 ? "best" : "worst";
-    const t = THEME[kind];
-    const hanja = `${SITE.titleHanja}勅令急如律百年同樂惡緣退散點神託發行第號符剋緣${info.tier.hanja}${info.tier.fu}0123456789`;
-    const korean = [A.name, B.name, info.short, info.tier.ko, info.tier.fuKo, "태풍고 폐미부 발행 학년 · 0123456789"].join("");
-    await Promise.all([
-      document.fonts.load(`800 40px ${F_TITLE}`, korean), document.fonts.load(`700 28px ${F_TITLE}`, korean),
-      document.fonts.load(`900 190px ${F_BOLD}`, hanja), document.fonts.load(`700 28px ${F_BOLD}`, hanja),
-    ]).catch(() => {});
-    // 왼쪽: 사진 없는 부적 (한자 · 부적 틀 · 점수 · 신탁)
-    const { W, H } = LAYOUT;
-    const cv = document.createElement("canvas");
-    cv.width = W; cv.height = H;
-    const ctx = cv.getContext("2d");
-    drawBackground(ctx, kind, info);
-    drawSeal(ctx, 830, 640, 130, 0.08, t.ink, t.paper, [[`${r.total}`, `800 56px ${F_TITLE}`, -12], ["點", `900 26px ${F_BOLD}`, 34]]);
-    const rb = LAYOUT.reason;
-    ctx.strokeStyle = t.ink; ctx.lineWidth = 2; ctx.strokeRect(rb.x, rb.y, rb.w, rb.h);
-    drawSeal(ctx, rb.x + 72, rb.y + rb.h / 2, 72, 0, t.ink, t.paper, [["神託", `900 24px ${F_BOLD}`, 1]]);
-    ctx.fillStyle = t.text; ctx.font = `700 36px ${F_TITLE}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    const lines = wrapText(ctx, info.short, rb.w - 190).slice(0, 2);
-    lines.forEach((l, i) => ctx.fillText(l, rb.x + 126 + (rb.w - 146) / 2, rb.y + rb.h / 2 - ((lines.length - 1) * 54) / 2 + i * 54));
-    const pp = LAYOUT.paper;
-    const paper = document.createElement("canvas");
-    paper.width = pp.w; paper.height = pp.h;
-    paper.getContext("2d").drawImage(cv, pp.x, pp.y, pp.w, pp.h, 0, 0, pp.w, pp.h);
-    // 오른쪽: 부적 카드 그대로 만들어서 하트 부분만 (두 사람 증명사진 + 緣 도장 + 이름)
-    const card = await makeCard(kind, { ...A, photo: `../${A.photo}` }, { ...r, partner: { ...B, photo: `../${B.photo}` } }, info);
-    const hp = LAYOUT.heart, hx = W / 2 - hp.w / 2 - 30, hy = hp.top - 50;
-    const heart = document.createElement("canvas");
-    heart.width = hp.w + 60; heart.height = hp.h + 80;
-    const hc = heart.getContext("2d");
-    hc.drawImage(card, hx, hy, heart.width, heart.height, 0, 0, heart.width, heart.height);
-    // 가장자리를 둥글게 흐리게 (네모난 종이 테두리가 안 보이게)
-    hc.globalCompositeOperation = "destination-in";
-    hc.translate(heart.width / 2, heart.height / 2); hc.scale(1, heart.height / heart.width);
-    const g = hc.createRadialGradient(0, 0, heart.width * 0.3, 0, 0, heart.width * 0.52);
-    g.addColorStop(0, "rgba(0,0,0,1)"); g.addColorStop(1, "rgba(0,0,0,0)");
-    hc.fillStyle = g; hc.fillRect(-heart.width, -heart.width, heart.width * 2, heart.width * 2);
-    return { paper, heart, total: r.total, tier: info.tier };
+    // 배경은 항상 연한 노랑 + 분홍 먹으로 (낮은 점수도 글자·도장은 그대로, 색만 맞춤)
+    const savedWorst = THEME.worst;
+    if (kind === "worst") THEME.worst = { ...savedWorst, paper: THEME.best.paper, ink: THEME.best.ink, text: THEME.best.text };
+    try {
+      const t = THEME[kind];
+      const hanja = `${SITE.titleHanja}勅令急如律百年同樂惡緣退散點神託發行第號符剋緣${info.tier.hanja}${info.tier.fu}0123456789`;
+      const korean = [A.name, B.name, info.short, info.tier.ko, info.tier.fuKo, "태풍고 폐미부 발행 학년 · 0123456789"].join("");
+      await Promise.all([
+        document.fonts.load(`800 40px ${F_TITLE}`, korean), document.fonts.load(`700 28px ${F_TITLE}`, korean),
+        document.fonts.load(`900 190px ${F_BOLD}`, hanja), document.fonts.load(`700 28px ${F_BOLD}`, hanja),
+      ]).catch(() => {});
+      // 왼쪽: 사진 없는 부적 (한자 · 하트 틀 · 점수 · 신탁)
+      const { W, H } = LAYOUT;
+      const cv = document.createElement("canvas");
+      cv.width = W; cv.height = H;
+      const ctx = cv.getContext("2d");
+      drawBackground(ctx, kind, info);
+      drawSeal(ctx, 830, 640, 130, 0.08, t.ink, t.paper, [[`${r.total}`, `800 56px ${F_TITLE}`, -12], ["點", `900 26px ${F_BOLD}`, 34]]);
+      const rb = LAYOUT.reason;
+      ctx.strokeStyle = t.ink; ctx.lineWidth = 2; ctx.strokeRect(rb.x, rb.y, rb.w, rb.h);
+      drawSeal(ctx, rb.x + 72, rb.y + rb.h / 2, 72, 0, t.ink, t.paper, [["神託", `900 24px ${F_BOLD}`, 1]]);
+      ctx.fillStyle = t.text; ctx.font = `700 36px ${F_TITLE}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      const lines = wrapText(ctx, info.short, rb.w - 190).slice(0, 2);
+      lines.forEach((l, i) => ctx.fillText(l, rb.x + 126 + (rb.w - 146) / 2, rb.y + rb.h / 2 - ((lines.length - 1) * 54) / 2 + i * 54));
+      const pp = LAYOUT.paper;
+      const paper = document.createElement("canvas");
+      paper.width = pp.w; paper.height = pp.h;
+      paper.getContext("2d").drawImage(cv, pp.x, pp.y, pp.w, pp.h, 0, 0, pp.w, pp.h);
+      // 오른쪽: 부적 카드를 만들어서 증명사진 두 장 + 緣 도장 부분만, 위아래는 흐리게
+      const card = await makeCard(kind, { ...A, photo: `../${A.photo}` }, { ...r, partner: { ...B, photo: `../${B.photo}` } }, info);
+      const photos = document.createElement("canvas");
+      photos.width = 620; photos.height = 440;
+      const pc = photos.getContext("2d");
+      pc.drawImage(card, 230, 680, 620, 440, 0, 0, 620, 440);
+      pc.globalCompositeOperation = "destination-in";
+      const g = pc.createLinearGradient(0, 0, 0, 440);
+      g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(0.14, "rgba(0,0,0,1)");
+      g.addColorStop(0.86, "rgba(0,0,0,1)"); g.addColorStop(1, "rgba(0,0,0,0)");
+      pc.fillStyle = g; pc.fillRect(0, 0, 620, 440);
+      return { paper, photos, total: r.total, tier: info.tier };
+    } finally {
+      THEME.worst = savedWorst;
+    }
   })().catch(() => null));
 }
 const loadImg = (src) => new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
@@ -378,6 +385,52 @@ async function renderSdPanels() {
   $("api-note").hidden = apiOk;
 }
 
+/* ---------- 긴 틀 배경 그림 맞추기 (확대 · 좌우 · 위아래 · 기울기) — 캐릭터마다 서버에 저장 ---------- */
+const localFit = {};
+function fitOf(c, i) {
+  const saved = localFit[c.id] || (sdIndex[c.id] && sdIndex[c.id].bgfit);
+  if (saved) return { ...saved };
+  return { z: 1, x: 0, y: 0, r: i === 0 ? -0.1 : 0.1 };
+}
+function renderFitPanels() {
+  $("fit-panels").innerHTML = sel.map((c, i) => {
+    const f = fitOf(c, i);
+    const fit = `<div class="fit" data-id="${c.id}" data-i="${i}">
+        <span class="pal-t"><b class="ab">${i ? "B" : "A"}</b> ${esc(c.name)} 배경</span>
+        <label>확대 <input type="range" min="0.6" max="2.5" step="0.01" value="${f.z}" data-f="z"></label>
+        <label>좌우 <input type="range" min="-0.5" max="0.5" step="0.01" value="${f.x}" data-f="x"></label>
+        <label>위아래 <input type="range" min="-0.5" max="0.5" step="0.01" value="${f.y}" data-f="y"></label>
+        <label>기울기 <input type="range" min="-30" max="30" step="1" value="${Math.round((f.r * 180) / Math.PI)}" data-f="r"></label>
+        <button type="button" class="mini ghost" data-f="reset">처음대로</button>
+      </div>`;
+    return fit;
+  }).join("");
+}
+let fitDraw = null, fitSave = null;
+$("fit-panels").addEventListener("input", (e) => {
+  const key = e.target.dataset.f;
+  const box = e.target.closest(".fit");
+  if (!key || !box || key === "reset") return;
+  const id = box.dataset.id, c = CHARACTERS.find((x) => x.id === id);
+  const f = fitOf(c, Number(box.dataset.i));
+  f[key] = key === "r" ? (Number(e.target.value) * Math.PI) / 180 : Number(e.target.value);
+  localFit[id] = f;
+  clearTimeout(fitDraw); fitDraw = setTimeout(renderPreview, 120);
+  clearTimeout(fitSave);
+  if (apiOk) fitSave = setTimeout(() => fetch(`/api/sd/${id}/bgfit`, {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(f),
+  }).then(() => { if (sdIndex[id]) sdIndex[id].bgfit = f; else sdIndex[id] = { bgfit: f }; }).catch(() => {}), 600);
+});
+$("fit-panels").addEventListener("click", async (e) => {
+  const b = e.target.closest('[data-f="reset"]');
+  if (!b) return;
+  const id = b.closest(".fit").dataset.id;
+  delete localFit[id];
+  if (sdIndex[id]) delete sdIndex[id].bgfit;
+  if (apiOk) await fetch(`/api/sd/${id}/bgfit`, { method: "DELETE" }).catch(() => {});
+  renderWork();
+});
+
 $("sd-panels").addEventListener("click", (e) => {
   const sw = e.target.closest(".sw");
   if (sw) openPicker(CHARACTERS.find((x) => x.id === sw.dataset.id), sw.dataset.slot);
@@ -452,15 +505,24 @@ $("mode").onclick = (e) => {
   renderWork();
 };
 
+// 지금 보여줄 썰: 고치는 중인 내용 → 사이트에서 직접 고쳐 저장한 썰 → stories.json 원본
+// (Claude가 원본을 새로 쓰면 버전이 달라져서, 예전에 고친 글 대신 새 썰이 나옴)
+const storyVersion = (st) => (st ? String(strHash(JSON.stringify(st))) : "");
+function savedEdit() {
+  const key = pairKey(sel[0], sel[1]), base = stories[key], ov = storyEdits[key];
+  return ov && ov.base === storyVersion(base) ? ov : null;
+}
 function currentStory() {
   if (edit) return edit;
-  return stories[pairKey(sel[0], sel[1])] || null;
+  const base = stories[pairKey(sel[0], sel[1])] || null;
+  const ov = savedEdit();
+  return ov ? { ...(base || {}), ...ov.story } : base;
 }
 function renderStoryNote() {
   const st = stories[pairKey(sel[0], sel[1])];
   const ask = `${sel[0].name} × ${sel[1].name} 써줘`;
   $("story-note").innerHTML = st
-    ? `<p class="ok">썰 있음 · <b>${esc(st.name)}</b> <span>(${esc(st.at || "")})</span></p>
+    ? `<p class="ok">썰 있음 · <b>${esc(st.name)}</b> <span>(${esc(st.at || "")}${savedEdit() ? " · 직접 고친 글" : ""})</span></p>
        <p class="sub">다시 쓰고 싶으면 Claude한테 <b>"${esc(sel[0].name)} × ${esc(sel[1].name)} 다시 써줘"</b></p>`
     : `<p class="wait">아직 이 페어 썰이 없어요</p>
        <p class="sub">폰 Claude 앱 → Code 탭 → <b>kunsa66/Private</b> 세션에서 이렇게 말해주세요</p>
@@ -480,6 +542,7 @@ async function renderWork() {
   renderMode(hasTall);
   renderStoryNote();
   renderPairName();
+  renderFitPanels();
   renderEdit();
   renderPreview();
 }
@@ -490,11 +553,8 @@ async function renderPreview() {
   const st = currentStory();
   const people = await Promise.all(sel.map(async (c) => {
     const [photo, full, small, tall, art] = await Promise.all([photoOf(c), fullOf(c), sdOf(c, "small"), sdOf(c, "tall"), sdOf(c, "art")]);
-    return { c, mbti: c.mbti, photo, full, small, tall, art, colors: colorsFor(c, small, tall) };
+    return { c, mbti: c.mbti, photo, full, small, tall, art, colors: colorsFor(c, small, tall), bgfit: fitOf(c, sel.indexOf(c)) };
   }));
-  // 긴 틀 배경: 왼쪽은 부적, 오른쪽은 하트 속 증명사진
-  const tal = await talismanOf(sel[0], sel[1]);
-  if (tal) { people[0].bg = { img: tal.paper, kind: "paper" }; people[1].bg = { img: tal.heart, kind: "heart" }; }
   const title = titleOf();
   await loadFrameFonts((st ? JSON.stringify(st) : "") + title.name);
   if (token !== previewToken) return;
@@ -613,7 +673,32 @@ $("edit-fields").addEventListener("input", (e) => {
   clearTimeout(editTimer);
   editTimer = setTimeout(renderPreview, 250);
 });
-$("edit-reset").onclick = () => { edit = null; renderEdit(); renderPreview(); };
+// 저장: 고친 글을 서버에 남김 (폰·PC 어디서 열어도 고친 글로 나옴)
+$("edit-save").onclick = async () => {
+  if (!edit) { $("edit-msg").textContent = "고친 내용이 없어요."; return; }
+  const key = pairKey(sel[0], sel[1]);
+  const body = { key, base: storyVersion(stories[key]), story: { tags: edit.tags || [], lines: edit.lines || {}, parts: edit.parts || {} } };
+  $("edit-msg").textContent = "저장 중…";
+  try {
+    const r = await fetch("/api/storyedit", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+    if (!r.ok) throw new Error();
+    storyEdits[key] = await r.json();
+    edit = null;
+    $("edit-msg").textContent = "저장했어요.";
+  } catch (e) { $("edit-msg").textContent = "저장하지 못했어요. (이 미리보기에는 적용돼요)"; return; }
+  renderStoryNote(); renderEdit(); renderPreview();
+};
+// 원래대로: 고친 글을 지우고 Claude가 쓴 원본으로
+$("edit-reset").onclick = async () => {
+  const key = pairKey(sel[0], sel[1]);
+  edit = null;
+  if (storyEdits[key]) {
+    delete storyEdits[key];
+    await fetch("/api/storyedit", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ key, story: null }) }).catch(() => {});
+  }
+  $("edit-msg").textContent = "원래 썰로 돌렸어요.";
+  renderStoryNote(); renderEdit(); renderPreview();
+};
 
 $("reload").onclick = async () => {
   $("reload").textContent = "확인 중…";
