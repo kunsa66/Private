@@ -111,37 +111,113 @@ async function prepareImage(file) {
   return { blob, canvas: out };
 }
 
-// SD 이미지에서 눈에 띄는 색 세 개 (검은 선·흰색은 빼고)
-const colorCache = new WeakMap();
-function colorsOf(img) {
-  if (!img) return [];
-  if (colorCache.has(img)) return colorCache.get(img);
-  const S = 90, k = S / Math.max(img.width, img.height);
+/* ---------- 색상 팔레트: 머리 · 눈 · 포인트 ----------
+   SD 이미지의 위치로 짐작 (작은 SD: 머리 위쪽 1/4, 눈은 그 아래 띠, 포인트는 옷)
+   틀리면 사이트에서 이미지를 눌러 직접 고름 → 서버에 저장 */
+const hex = (r, g, b) => "#" + [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
+const dist = (a, b) => Math.hypot(a[0] - b[0], a[1] - b[1], a[2] - b[2]);
+const autoCache = new WeakMap();
+function autoColors(fig, kind) {
+  if (!fig) return {};
+  const img = fig.img;
+  if (autoCache.has(img)) return autoCache.get(img);
+  const H = 240, k = H / img.height, W = Math.max(1, Math.round(img.width * k));
   const cv = document.createElement("canvas");
-  cv.width = Math.max(1, Math.round(img.width * k)); cv.height = Math.max(1, Math.round(img.height * k));
+  cv.width = W; cv.height = H;
   const x = cv.getContext("2d", { willReadFrequently: true });
-  x.drawImage(img, 0, 0, cv.width, cv.height);
-  const d = x.getImageData(0, 0, cv.width, cv.height).data;
-  const bins = new Map();
-  for (let p = 0; p < d.length; p += 4) {
-    if (d[p + 3] < 200) continue;
-    const mx = Math.max(d[p], d[p + 1], d[p + 2]), mn = Math.min(d[p], d[p + 1], d[p + 2]);
-    if (mx < 60 || mn > 236) continue;
-    const key = (d[p] >> 4) << 8 | (d[p + 1] >> 4) << 4 | (d[p + 2] >> 4);
-    const b = bins.get(key) || { n: 0, r: 0, g: 0, b: 0 };
-    b.n++; b.r += d[p]; b.g += d[p + 1]; b.b += d[p + 2];
-    bins.set(key, b);
-  }
-  const picked = [];
-  for (const b of [...bins.values()].sort((a, c) => c.n - a.n)) {
-    const col = [b.r / b.n, b.g / b.n, b.b / b.n];
-    if (picked.every((q) => Math.hypot(q[0] - col[0], q[1] - col[1], q[2] - col[2]) > 70)) picked.push(col);
-    if (picked.length === 3) break;
-  }
-  const res = picked.map((q) => `rgb(${q.map(Math.round).join(",")})`);
-  colorCache.set(img, res);
+  x.drawImage(img, 0, 0, W, H);
+  const d = x.getImageData(0, 0, W, H).data;
+  const band = kind === "tall"
+    ? { hair: [0, 0.12], eye: [0.14, 0.26], point: [0.4, 0.72] }
+    : { hair: [0, 0.22], eye: [0.32, 0.5], point: [0.6, 0.86] };
+  // 영역 안에서 색 덩어리 세기 (검은 선·흰색·빼라는 색 제외)
+  const clusters = (yr, xr, avoid = []) => {
+    const bins = new Map();
+    for (let y = Math.floor(yr[0] * H); y < Math.ceil(yr[1] * H); y++) {
+      for (let xx = Math.floor(xr[0] * W); xx < Math.ceil(xr[1] * W); xx++) {
+        const p = (y * W + xx) * 4;
+        if (d[p + 3] < 200) continue;
+        const c = [d[p], d[p + 1], d[p + 2]];
+        const mx = Math.max(...c), mn = Math.min(...c);
+        if (mx < 70 || mn > 238) continue;
+        if (avoid.some(([col, r]) => dist(c, col) < r)) continue;
+        const key = (c[0] >> 4) << 8 | (c[1] >> 4) << 4 | (c[2] >> 4);
+        const b = bins.get(key) || { n: 0, s: [0, 0, 0] };
+        b.n++; b.s[0] += c[0]; b.s[1] += c[1]; b.s[2] += c[2];
+        bins.set(key, b);
+      }
+    }
+    return [...bins.values()].sort((a, b) => b.n - a.n).map((b) => ({ n: b.n, col: b.s.map((v) => v / b.n) }));
+  };
+  const out = {};
+  const hair = clusters(band.hair, [0.15, 0.85])[0];
+  if (hair) out.hair = hair.col;
+  const skin = clusters(band.eye, [0.35, 0.65], hair ? [[hair.col, 50]] : [])[0];
+  const avoid = [hair && [hair.col, 55], skin && [skin.col, 45]].filter(Boolean);
+  const eye = clusters(band.eye, [0.15, 0.85], avoid)[0];
+  if (eye) out.eye = eye.col;
+  const point = clusters(band.point, [0.2, 0.8], avoid)[0];
+  if (point) out.point = point.col;
+  const res = Object.fromEntries(Object.entries(out).map(([kk, c]) => [kk, hex(...c)]));
+  autoCache.set(img, res);
   return res;
 }
+const localColors = {};   // 서버 저장이 안 될 때
+function colorsFor(c, small, tall) {
+  const auto = small ? autoColors(small, "small") : autoColors(tall, "tall");
+  const saved = localColors[c.id] || (sdIndex[c.id] && sdIndex[c.id].colors) || {};
+  return { ...auto, ...saved };
+}
+async function saveColors(c, colors) {
+  localColors[c.id] = colors;
+  if (!apiOk) return;
+  try {
+    const r = await fetch(`/api/sd/${c.id}/colors`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(colors) });
+    if (r.ok) { await loadIndex(); delete localColors[c.id]; }
+  } catch (e) {}
+}
+
+/* 스포이드: SD 이미지를 눌러서 색 고르기 */
+let picking = null;
+async function openPicker(c, slot) {
+  const [small, tall] = await Promise.all([sdOf(c, "small"), sdOf(c, "tall")]);
+  const fig = small || tall;
+  if (!fig) { alert("먼저 SD 이미지를 올려주세요."); return; }
+  const cv = $("picker-cv"), img = fig.img;
+  const k = Math.min(1, 900 / img.height);
+  cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
+  const x = cv.getContext("2d", { willReadFrequently: true });
+  x.clearRect(0, 0, cv.width, cv.height);
+  x.drawImage(img, 0, 0, cv.width, cv.height);
+  const cur = colorsFor(c, small, tall);
+  picking = { c, slot, color: cur[slot] || "#cccccc", all: cur };
+  const label = { hair: "머리색", eye: "눈 색", point: "포인트 색" }[slot];
+  $("picker-title").textContent = `${c.name} · ${label}`;
+  $("picker-pv").style.background = picking.color;
+  $("picker").hidden = false;
+}
+function pickAt(e) {
+  if (!picking) return;
+  const cv = $("picker-cv"), r = cv.getBoundingClientRect();
+  const px = Math.floor(((e.clientX - r.left) / r.width) * cv.width), py = Math.floor(((e.clientY - r.top) / r.height) * cv.height);
+  const d = cv.getContext("2d").getImageData(Math.max(0, px - 1), Math.max(0, py - 1), 3, 3).data;
+  let n = 0, s = [0, 0, 0];
+  for (let p = 0; p < d.length; p += 4) if (d[p + 3] > 128) { n++; s[0] += d[p]; s[1] += d[p + 1]; s[2] += d[p + 2]; }
+  if (!n) return;
+  picking.color = hex(s[0] / n, s[1] / n, s[2] / n);
+  $("picker-pv").style.background = picking.color;
+}
+$("picker-cv").addEventListener("pointerdown", (e) => { pickAt(e); $("picker-cv").setPointerCapture(e.pointerId); });
+$("picker-cv").addEventListener("pointermove", (e) => { if (e.buttons) pickAt(e); });
+$("picker-cancel").onclick = () => { picking = null; $("picker").hidden = true; };
+$("picker-ok").onclick = async () => {
+  if (!picking) return;
+  const { c, slot, color } = picking;
+  const saved = { ...((sdIndex[c.id] && sdIndex[c.id].colors) || {}), ...(localColors[c.id] || {}), [slot]: color };
+  picking = null; $("picker").hidden = true;
+  await saveColors(c, saved);
+  renderWork();
+};
 
 /* ---------- 이름 고르기 ---------- */
 function photoTag(c) {
@@ -210,11 +286,23 @@ async function renderSdPanels() {
         ${f ? `<label class="sd-scale">크기 <input type="range" min="0.7" max="1.3" step="0.01" value="${f.s || 1}" data-act="scale"></label>` : ""}
       </div>`;
     }));
-    return `<div class="sd-person"><h4><b class="ab">${i ? "B" : "A"}</b>${esc(c.name)}</h4><div class="sd-row">${cells.join("")}</div></div>`;
+    const [small, tall] = await Promise.all([sdOf(c, "small"), sdOf(c, "tall")]);
+    const cols = colorsFor(c, small, tall);
+    const pal = (small || tall)
+      ? `<div class="pal"><span class="pal-t">색</span>${[["hair", "머리"], ["eye", "눈"], ["point", "포인트"]].map(([k, l]) =>
+          `<button type="button" class="sw" data-id="${c.id}" data-slot="${k}"><i style="background:${esc(cols[k] || "#ddd")}"></i>${l}</button>`).join("")}
+         <span class="pal-h">눌러서 바꾸기</span></div>`
+      : "";
+    return `<div class="sd-person"><h4><b class="ab">${i ? "B" : "A"}</b>${esc(c.name)}</h4><div class="sd-row">${cells.join("")}</div>${pal}</div>`;
   }));
   $("sd-panels").innerHTML = html.join("");
   $("api-note").hidden = apiOk;
 }
+
+$("sd-panels").addEventListener("click", (e) => {
+  const sw = e.target.closest(".sw");
+  if (sw) openPicker(CHARACTERS.find((x) => x.id === sw.dataset.id), sw.dataset.slot);
+});
 
 let uploadTarget = null;
 $("sd-panels").addEventListener("click", async (e) => {
@@ -321,7 +409,7 @@ async function renderPreview() {
   const st = currentStory();
   const people = await Promise.all(sel.map(async (c) => {
     const [photo, small, tall] = await Promise.all([photoOf(c), sdOf(c, "small"), sdOf(c, "tall")]);
-    return { c, mbti: mbtiFix[c.id] || c.mbti, photo, small, tall, colors: colorsOf((small || tall || {}).img) };
+    return { c, mbti: mbtiFix[c.id] || c.mbti, photo, small, tall, colors: colorsFor(c, small, tall) };
   }));
   await loadFrameFonts(st ? JSON.stringify(st) : "");
   if (token !== previewToken) return;
@@ -340,7 +428,6 @@ async function renderPreview() {
 const EDIT_FIELDS = (A, B) => [
   ["name", "페어명"], ["tags", "태그 (띄어쓰기로 구분)"],
   [`lines.${A.id}`, `${A.name} 대사`], [`lines.${B.id}`, `${B.name} 대사`],
-  [`views.${A.id}`, `${A.name} → ${B.name}`], [`views.${B.id}`, `${B.name} → ${A.name}`],
   ["parts.meet", "01 첫 만남"], ["parts.some", "02 썸"], ["parts.love", "03 연애"], ["parts.end", "04 헤어짐"],
 ];
 const getPath = (o, p) => p.split(".").reduce((x, k) => (x ? x[k] : undefined), o);
@@ -355,7 +442,7 @@ function renderEdit() {
   const base = currentStory() || { name: "", tags: [], lines: {}, views: {}, parts: {} };
   $("edit-fields").innerHTML = EDIT_FIELDS(sel[0], sel[1]).map(([p, label]) => {
     const v = p === "tags" ? (base.tags || []).join(" ") : getPath(base, p) || "";
-    const long = p.startsWith("parts.") || p.startsWith("views.");
+    const long = p.startsWith("parts.");
     return `<label>${esc(label)}${long ? `<textarea data-p="${p}" rows="3">${esc(v)}</textarea>` : `<input data-p="${p}" value="${esc(v)}">`}</label>`;
   }).join("");
   $("edit-box").open = open;

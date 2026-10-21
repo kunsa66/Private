@@ -30,7 +30,8 @@ const ROUTES = {
    GET    /api/sd/<id>/<kind>      → PNG (kind: small | tall)
    PUT    /api/sd/<id>/<kind>      → PNG 올리기 (브라우저에서 배경 지우고 여백 자른 것)
    POST   /api/sd/<id>/<kind>/scale  { s } → 크기 보정만 저장
-   DELETE /api/sd/<id>/<kind>      → 지우기 */
+   DELETE /api/sd/<id>/<kind>      → 지우기
+   POST   /api/sd/<id>/colors      { hair, eye, point } → 틀에 넣을 색 (목록의 colors) */
 const SD_KINDS = ["small", "tall"];
 const SD_MAX = 5 * 1024 * 1024;
 const isPng = (buf) => {
@@ -46,6 +47,23 @@ async function handleSd(request, env, parts) {
     return json(await readIndex());
   }
   const [id, kind, extra] = parts;
+  // 색상 팔레트 (머리·눈·포인트): POST /api/sd/<id>/colors { hair, eye, point }
+  if (ID_RE.test(id || "") && kind === "colors" && request.method === "POST") {
+    let body;
+    try { body = await request.json(); } catch { return json({ error: "잘못된 요청" }, 400); }
+    const colors = {};
+    for (const k of ["hair", "eye", "point"]) {
+      if (body[k] == null || body[k] === "") continue;
+      if (!/^#[0-9a-f]{6}$/i.test(body[k])) return json({ error: "잘못된 색" }, 400);
+      colors[k] = body[k].toLowerCase();
+    }
+    const index = await readIndex();
+    index[id] = { ...(index[id] || {}), colors };
+    if (!Object.keys(colors).length) delete index[id].colors;
+    if (!Object.keys(index[id]).length) delete index[id];
+    await kv.put("sd-index", JSON.stringify(index));
+    return json({ saved: true, colors });
+  }
   if (!ID_RE.test(id || "") || !SD_KINDS.includes(kind)) return json({ error: "잘못된 주소" }, 400);
   const key = `sd:${id}:${kind}`;
 

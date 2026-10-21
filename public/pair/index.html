@@ -5,17 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>태풍고 틀 생성기</title>
 <meta name="robots" content="noindex">
-<meta name="theme-color" content="#3F7FE3">
-<meta name="build" content="1">
+<meta name="theme-color" content="#F1F2F4">
+<meta name="build" content="2">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Gaegu:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" rel="stylesheet">
 <link rel="stylesheet" href="pair.css">
 </head>
 <body>
 <header class="top">
-  <h1 aria-label="태풍고 틀 생성기"><span>태</span><span>풍</span><span>고</span> <span class="lt">틀</span><span class="lt">생</span><span class="lt">성</span><span class="lt">기</span></h1>
+  <h1>태풍고 틀 생성기<i aria-hidden="true">✦</i></h1>
   <p>이름 두 개 → SD 넣기 → 썰 → PNG</p>
 </header>
 
@@ -67,6 +67,14 @@
 
 <input type="file" id="file" accept="image/*" hidden>
 <div class="busy" id="busy" hidden><span>이미지 손질 중…</span></div>
+<div class="picker" id="picker" hidden>
+  <div class="picker-box">
+    <p class="picker-t" id="picker-title"></p>
+    <p class="sub">이미지에서 원하는 색을 눌러주세요</p>
+    <div class="picker-img"><canvas id="picker-cv"></canvas></div>
+    <div class="picker-row"><span class="pv" id="picker-pv"></span><button type="button" class="btn ghost" id="picker-cancel">취소</button><button type="button" class="btn" id="picker-ok">이 색으로</button></div>
+  </div>
+</div>
 
 <script src="../data.js"></script>
 <script src="roster.js"></script>
