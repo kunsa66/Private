@@ -25,7 +25,7 @@ const FF = {
 };
 const PARTS = [["meet", "첫 만남"], ["some", "썸"], ["love", "연애"], ["end", "헤어짐"]];
 const COLOR_SLOTS = [["hair", "머리"], ["eye", "눈"], ["point", "포인트"]];
-const PANEL = { w: 530, h: 1300, y: 60, inset: 60 };
+const PANEL = { w: 516, h: 1268, y: 76, inset: 84 };
 
 /* ---------- 도구 ---------- */
 function rrect(ctx, x, y, w, h, r) {
@@ -217,11 +217,17 @@ function drawPanel(ctx, P, side, mode, story) {
   ctx.save();
   rrect(ctx, x, y, w, h, 44); ctx.clip();
   // 배경: 직접 올린 그림 → 프로필 문서 전신 → 두상
+  // 크게 확대하고 살짝 기울여서 틀을 빈틈없이 채움 (머리·상반신이 보이게)
   const bg = (P.art && P.art.img) || P.full || P.photo;
   if (bg) {
-    const r = Math.max(w / bg.width, h / bg.height), sw = w / r, sh = h / r;
+    const tilt = left ? -0.13 : 0.13, c = Math.cos(tilt), s = Math.sin(tilt);
+    const cover = Math.max((w * c + h * s) / bg.width, (w * s + h * c) / bg.height);
+    const k = cover * (P.art || P.full ? 1.45 : 1.15);
     ctx.globalAlpha = P.art || P.full ? 0.3 : 0.2;
-    ctx.drawImage(bg, (bg.width - sw) / 2, (bg.height - sh) * 0.15, sw, sh, x, y, w, h);
+    ctx.translate(x + w / 2, y + h / 2); ctx.rotate(tilt);
+    // 그림 윗부분(얼굴 쪽)이 틀 가운데 위로 오게 아래로 밀어서 그림
+    ctx.drawImage(bg, -bg.width * k / 2, -h * c / 2 - bg.height * k * 0.04, bg.width * k, bg.height * k);
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.globalAlpha = 1;
   }
   ctx.fillStyle = FC.tint; ctx.fillRect(x, y, w, h);
@@ -241,7 +247,7 @@ function drawPanel(ctx, P, side, mode, story) {
 
   // 색상 칩 (머리 · 눈 · 포인트)
   const cols = COLOR_SLOTS.filter(([k]) => P.colors && P.colors[k]);
-  cols.forEach(([k, label], i) => {
+  cols.forEach(([k], i) => {
     const cx = left ? tx + 24 + i * 78 : tx - 24 - (cols.length - 1 - i) * 78, cy = y + 262;
     ctx.save();
     softShadow(ctx, 8, 2, 0.12);
@@ -250,8 +256,6 @@ function drawPanel(ctx, P, side, mode, story) {
     ctx.restore();
     ctx.fillStyle = P.colors[k];
     ctx.beginPath(); ctx.arc(cx, cy, 19, 0, Math.PI * 2); ctx.fill();
-    ctx.font = `600 18px ${FF.body}`; ctx.fillStyle = FC.sub; ctx.textAlign = "center";
-    ctx.fillText(label, cx, cy + 50);
   });
 
   // SD: 한 쌍 = 작은 SD, 두 쌍 = 길쭉한 SD + 작은 SD 스티커
@@ -260,7 +264,7 @@ function drawPanel(ctx, P, side, mode, story) {
   if (mode === "two") {
     const main = P.tall || P.small;
     headX = mid + (left ? 40 : -40);
-    headTop = drawFigure(ctx, main, headX, foot, P.tall ? 820 : 700, !P.tall);
+    headTop = drawFigure(ctx, main, headX, foot, P.tall ? 790 : 700, !P.tall);
     if (P.tall) drawFigure(ctx, P.small, left ? x + 110 : x + w - 110, y + h + 30, 330, true);
   } else {
     headX = mid;
@@ -421,11 +425,6 @@ function drawCards(ctx, story, seedKey, writers) {
       const { lines, size } = fitText(ctx, text, w - 72, 8, (z) => `400 ${z}px ${font}`, sizes);
       ctx.font = `400 ${size}px ${font}`; ctx.fillStyle = FC.text;
       lines.forEach((l, k) => ctx.fillText(l, 38, 143 + k * 37));
-      if (who) {
-        ctx.font = `400 ${girl ? 28 : 33}px ${font}`; ctx.fillStyle = FC.blue; ctx.textAlign = "right";
-        ctx.fillText(`- ${who.name.length > 2 ? who.name.slice(-2) : who.name} -`, w - 30, h - 26);
-        ctx.textAlign = "left";
-      }
     } else {
       ctx.font = `600 26px ${FF.body}`; ctx.fillStyle = FC.sub; ctx.textAlign = "center";
       ctx.fillText("아직 썰이 없어요", w / 2, h / 2 + 30);
@@ -441,67 +440,150 @@ function drawCards(ctx, story, seedKey, writers) {
     } else {
       drawTape(ctx, x + w / 2 + (rand() - 0.5) * 90, y + 4, 140 + rand() * 30, (rand() - 0.5) * 0.35, tapes[i]);
     }
+    // 아래쪽 모서리에도 (대각선으로 엇갈리게 균형 맞춤)
+    if (i === 1 || i === 2 || rand() < 0.3) {
+      const right = i % 2 === 0;
+      drawTape(ctx, right ? x + w - 18 : x + 18, y + h - 10, 104, right ? -0.72 : 0.72, tapes[(i + 2) % 4]);
+    }
   });
 }
 
-/* ---------- 가장자리 꾸미기: 테이프 · 별 · 반짝이 · + 표시 · 픽셀 마우스 ---------- */
-const CURSOR = [
-  "......XX.........",
-  ".....XooX........",
-  ".....XooX........",
-  ".....XooX........",
-  ".....XooXXX......",
-  ".....XooXooXX....",
-  ".....XooXooXoXX..",
-  ".XX..XooXooXoXoX.",
-  "XooX.XoooooooooX.",
-  "XoooXXoooooooooX.",
-  ".XoooXoooooooooX.",
-  "..XoooooooooooX..",
-  "..XooooooooooX...",
-  "...XoooooooooX...",
-  "...XooooooooX....",
-  "....XoooooooX....",
-  "....XXXXXXXXX....",
-];
-function pixelCursor(ctx, x, y, px, rot = 0) {
-  ctx.save();
-  ctx.translate(x, y); ctx.rotate(rot);
-  softShadow(ctx, 6, 3, 0.18);
-  CURSOR.forEach((row, r) => [...row].forEach((ch, c) => {
-    if (ch === ".") return;
-    ctx.fillStyle = ch === "X" ? FC.ink : "#fff";
-    ctx.fillRect(c * px, r * px, px + 0.5, px + 0.5);
-  }));
-  ctx.restore();
-}
-function plusRow(ctx, x, y, n, color = "#C3C9D2") {
-  ctx.strokeStyle = color; ctx.lineWidth = 4; ctx.lineCap = "round";
-  for (let i = 0; i < n; i++) {
-    const cx = x + i * 46;
-    ctx.beginPath(); ctx.moveTo(cx - 13, y); ctx.lineTo(cx + 13, y); ctx.moveTo(cx, y - 13); ctx.lineTo(cx, y + 13); ctx.stroke();
-  }
-}
+/* ---------- 가장자리 꾸미기: 테이프 · 별 · 반짝이 ---------- */
 function drawDeco(ctx) {
   const L = PANEL.inset, R = FW - PANEL.inset, T = PANEL.y, Bt = PANEL.y + PANEL.h;
-  // 긴 틀 모서리 테이프
+  // 긴 틀 테이프: 대각선으로 엇갈리게 (A는 왼쪽 위·오른쪽 아래, B는 오른쪽 위·왼쪽 아래)
   drawTape(ctx, L + 22, T + 18, 150, -0.72, "stripe");
+  drawTape(ctx, L + PANEL.w - 24, Bt - 16, 140, -0.72, "gray");
   drawTape(ctx, R - 22, T + 18, 150, 0.72, "gray");
+  drawTape(ctx, R - PANEL.w + 24, Bt - 16, 140, 0.72, "stripe");
   // 별
-  drawStar(ctx, L + PANEL.w - 10, T + 16, 34, 0.25, FC.blue, FC.ink);
-  drawStar(ctx, R - PANEL.w + 14, Bt - 20, 28, -0.2, "#fff", FC.ink);
-  drawStar(ctx, 1000, FH - 34, 20, 0.1, "#fff", FC.ink);
+  drawStar(ctx, L + PANEL.w - 12, T + 18, 34, 0.25, FC.blue, FC.ink);
+  drawStar(ctx, R - PANEL.w + 14, T + 22, 24, -0.2, "#fff", FC.ink);
+  drawStar(ctx, L + 30, Bt - 40, 22, 0.15, "#fff", FC.ink);
   // 반짝이
   sparkle(ctx, L + PANEL.w + 20, 842, 16, FC.blue);
   sparkle(ctx, R - PANEL.w - 18, 318, 13, FC.blue);
   sparkle(ctx, R - PANEL.w - 22, 1110, 10, FC.blue);
   sparkle(ctx, L + PANEL.w + 18, 1240, 9, FC.blue);
-  // + + +
-  plusRow(ctx, 780, FH - 36, 3);
-  plusRow(ctx, 1128, FH - 36, 3);
-  // 픽셀 마우스
-  pixelCursor(ctx, R - PANEL.w - 62, 1250, 4.2, -0.35);
-  pixelCursor(ctx, L + PANEL.w - 44, 1230, 3.6, 0.3);
+}
+
+/* ---------- 배경에 깔리는 청춘 소품 (틀 뒤로 살짝 삐져나오게, 연하게) ---------- */
+function at(ctx, x, y, rot, alpha, fn) {
+  ctx.save();
+  ctx.translate(x, y); ctx.rotate(rot); ctx.globalAlpha = alpha;
+  fn();
+  ctx.restore();
+}
+// 찢은 줄 노트
+function propNotebook(ctx, w, h, rand) {
+  softShadow(ctx, 16, 6, 0.1);
+  ctx.beginPath();
+  ctx.moveTo(-w / 2, -h / 2); ctx.lineTo(w / 2, -h / 2); ctx.lineTo(w / 2, h / 2);
+  for (let x = w / 2; x > -w / 2; x -= 10 + rand() * 8) ctx.lineTo(x, h / 2 - rand() * 12);
+  ctx.lineTo(-w / 2, h / 2); ctx.closePath();
+  ctx.fillStyle = "#FDFDFC"; ctx.fill();
+  noShadow(ctx);
+  ctx.save(); ctx.clip();
+  ctx.strokeStyle = "rgba(59,123,230,.18)"; ctx.lineWidth = 2;
+  for (let y = -h / 2 + 90; y < h / 2; y += 34) { ctx.beginPath(); ctx.moveTo(-w / 2, y); ctx.lineTo(w / 2, y); ctx.stroke(); }
+  ctx.strokeStyle = "rgba(229,72,77,.25)";
+  ctx.beginPath(); ctx.moveTo(-w / 2 + 60, -h / 2); ctx.lineTo(-w / 2 + 60, h / 2); ctx.stroke();
+  ctx.restore();
+  ctx.save(); ctx.fillStyle = FC.bg; // 구멍: 바탕색으로 (전체 그림을 뚫지 않게)
+  for (let y = -h / 2 + 40; y < h / 2 - 20; y += 40) { ctx.beginPath(); ctx.arc(-w / 2 + 24, y, 8, 0, Math.PI * 2); ctx.fill(); }
+  ctx.restore();
+}
+// 폰 (잠금화면에 시간)
+function propPhone(ctx) {
+  const w = 300, h = 600;
+  softShadow(ctx, 20, 8, 0.14);
+  ctx.fillStyle = "#DCE1E8"; rrect(ctx, -w / 2, -h / 2, w, h, 46); ctx.fill();
+  noShadow(ctx);
+  const g = ctx.createLinearGradient(0, -h / 2, 0, h / 2);
+  g.addColorStop(0, "#BFD6F6"); g.addColorStop(1, "#F2F6FC");
+  ctx.fillStyle = g; rrect(ctx, -w / 2 + 12, -h / 2 + 12, w - 24, h - 24, 36); ctx.fill();
+  ctx.fillStyle = "#23272F"; rrect(ctx, -40, -h / 2 + 24, 80, 22, 11); ctx.fill();
+  ctx.fillStyle = "#fff"; ctx.textAlign = "center";
+  ctx.font = `600 22px ${FF.body}`; ctx.fillText("10월 22일 목요일", 0, -h / 2 + 110);
+  ctx.font = `800 84px ${FF.body}`; ctx.fillText("08:20", 0, -h / 2 + 196);
+  ctx.fillStyle = "rgba(255,255,255,.75)"; rrect(ctx, -w / 2 + 30, -h / 2 + 250, w - 60, 74, 18); ctx.fill();
+  ctx.fillStyle = "#3A404B"; ctx.textAlign = "left"; ctx.font = `700 19px ${FF.body}`;
+  ctx.fillText("♪ 오늘의 노래", -w / 2 + 48, -h / 2 + 282);
+  ctx.fillStyle = "#8A919C"; ctx.font = `500 17px ${FF.body}`;
+  ctx.fillText("재생 중 · 0:42", -w / 2 + 48, -h / 2 + 308);
+}
+// 하늘 사진 폴라로이드
+function propPolaroid(ctx) {
+  const w = 230, h = 270;
+  softShadow(ctx, 14, 6, 0.12);
+  ctx.fillStyle = "#fff"; ctx.fillRect(-w / 2, -h / 2, w, h);
+  noShadow(ctx);
+  const g = ctx.createLinearGradient(0, -h / 2 + 14, 0, h / 2 - 60);
+  g.addColorStop(0, "#6FA5EE"); g.addColorStop(1, "#D9E8FB");
+  ctx.fillStyle = g; ctx.fillRect(-w / 2 + 14, -h / 2 + 14, w - 28, h - 74);
+  ctx.fillStyle = "rgba(255,255,255,.92)";
+  [[-30, 30, 30], [0, 18, 38], [34, 32, 28], [62, 40, 20], [-58, 42, 20]].forEach(([cx, cy, r]) => { ctx.beginPath(); ctx.arc(cx, cy, r, 0, Math.PI * 2); ctx.fill(); });
+  ctx.fillStyle = "#8A919C"; ctx.textAlign = "center"; ctx.font = `400 30px ${FF.handGirl}`;
+  ctx.fillText("여름, 운동장", 0, h / 2 - 22);
+}
+// 카세트테이프
+function propCassette(ctx) {
+  const w = 330, h = 210;
+  softShadow(ctx, 14, 6, 0.12);
+  ctx.fillStyle = "#D6E2F5"; rrect(ctx, -w / 2, -h / 2, w, h, 16); ctx.fill();
+  noShadow(ctx);
+  ctx.fillStyle = "#fff"; rrect(ctx, -w / 2 + 20, -h / 2 + 18, w - 40, 120, 10); ctx.fill();
+  ctx.fillStyle = "#3B7BE6"; ctx.fillRect(-w / 2 + 20, -h / 2 + 18, w - 40, 26);
+  ctx.fillStyle = "#3A404B"; ctx.textAlign = "left"; ctx.font = `400 30px ${FF.handBoy}`;
+  ctx.fillText("MIX TAPE ♡ 2026", -w / 2 + 34, -h / 2 + 76);
+  ctx.fillStyle = "#AEB9C9"; rrect(ctx, -84, -h / 2 + 88, 168, 40, 20); ctx.fill();
+  [-50, 50].forEach((cx) => {
+    ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(cx, -h / 2 + 108, 15, 0, Math.PI * 2); ctx.fill();
+    ctx.fillStyle = "#AEB9C9"; ctx.beginPath(); ctx.arc(cx, -h / 2 + 108, 6, 0, Math.PI * 2); ctx.fill();
+  });
+  ctx.fillStyle = "#C3D2EA"; rrect(ctx, -100, h / 2 - 50, 200, 40, 8); ctx.fill();
+}
+// 학생증
+function propIdCard(ctx) {
+  const w = 330, h = 210;
+  softShadow(ctx, 14, 6, 0.12);
+  ctx.fillStyle = "#fff"; rrect(ctx, -w / 2, -h / 2, w, h, 16); ctx.fill();
+  noShadow(ctx);
+  ctx.save(); rrect(ctx, -w / 2, -h / 2, w, h, 16); ctx.clip();
+  ctx.fillStyle = "#3B7BE6"; ctx.fillRect(-w / 2, -h / 2, w, 52);
+  ctx.restore();
+  ctx.fillStyle = "#fff"; ctx.textAlign = "left"; ctx.font = `30px ${FF.title}`;
+  ctx.fillText("태풍고등학교", -w / 2 + 22, -h / 2 + 38);
+  ctx.fillStyle = "#E4E7EC"; ctx.fillRect(-w / 2 + 22, -h / 2 + 70, 86, 108);
+  ctx.fillStyle = "#C3C9D2";
+  [[0, 160], [26, 120], [52, 140], [78, 90]].forEach(([dy, lw]) => ctx.fillRect(-w / 2 + 128, -h / 2 + 80 + dy, lw, 12));
+  ctx.fillStyle = "#8A919C"; ctx.font = `700 15px ${FF.body}`;
+  ctx.fillText("STUDENT ID", -w / 2 + 128, h / 2 - 22);
+}
+// 축제 입장권
+function propTicket(ctx) {
+  const w = 300, h = 120;
+  softShadow(ctx, 12, 5, 0.12);
+  ctx.fillStyle = "#E3EDFC"; ctx.fillRect(-w / 2, -h / 2, w, h);
+  noShadow(ctx);
+  ctx.save(); ctx.fillStyle = FC.bg;
+  [[-w / 2, 0], [w / 2, 0]].forEach(([cx, cy]) => { ctx.beginPath(); ctx.arc(cx, cy, 16, 0, Math.PI * 2); ctx.fill(); });
+  ctx.restore();
+  ctx.setLineDash([6, 6]); ctx.strokeStyle = "#9DBBEA"; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(w / 2 - 74, -h / 2 + 8); ctx.lineTo(w / 2 - 74, h / 2 - 8); ctx.stroke(); ctx.setLineDash([]);
+  ctx.fillStyle = "#3B7BE6"; ctx.textAlign = "left"; ctx.font = `34px ${FF.title}`;
+  ctx.fillText("ADMIT ONE", -w / 2 + 26, -4);
+  ctx.fillStyle = "#8A919C"; ctx.font = `600 16px ${FF.body}`;
+  ctx.fillText("태풍고 가을 축제 · No.0715", -w / 2 + 26, 30);
+}
+function drawBackdrop(ctx, seedKey) {
+  const rand = seeded(strHash(seedKey + "#bg"));
+  at(ctx, 120, 210, -0.22, 0.9, () => propNotebook(ctx, 460, 600, rand));      // 왼쪽 위
+  at(ctx, 1352, 40, 0.2, 0.85, () => propPolaroid(ctx));                       // 위 가운데 오른쪽
+  at(ctx, 1950, 150, 0.42, 0.85, () => propTicket(ctx));                       // 오른쪽 위
+  at(ctx, 1935, 1240, -0.32, 0.8, () => propPhone(ctx));                       // 오른쪽 아래
+  at(ctx, 760, 1430, -0.08, 0.85, () => propCassette(ctx));                    // 아래 가운데
+  at(ctx, 70, 1330, 0.32, 0.85, () => propIdCard(ctx));                        // 왼쪽 아래
 }
 
 /* ---------- 전체 ---------- */
@@ -515,6 +597,7 @@ function drawFrame(canvas, opts) {
   ctx.fillStyle = FC.bg;
   ctx.fillRect(0, 0, FW, FH);
 
+  drawBackdrop(ctx, `${A.c.id}|${B.c.id}`);
   drawTitle(ctx, title.name || (story ? story.name : `${A.c.name.slice(-2)} × ${B.c.name.slice(-2)}`), story ? story.tags : [], title.colors || []);
   drawCards(ctx, story, `${A.c.id}|${B.c.id}`, [A.c, B.c]);
   drawPanel(ctx, A, 0, opts.mode, story);
