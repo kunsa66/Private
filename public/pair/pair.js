@@ -48,6 +48,12 @@ async function sdOf(c, kind) {
   const img = await imgCache[k];
   return img ? { img, s: meta.s || 1, v: meta.v } : null;
 }
+const fullCache = {};
+async function fullOf(c) {
+  if (!(window.PAIR_FULL || []).includes(c.id)) return null;
+  if (!fullCache[c.id]) fullCache[c.id] = loadImage(`../full/${c.id}.jpg`).catch(() => null);
+  return fullCache[c.id];
+}
 async function photoOf(c) {
   if (!c.photo) return null;
   if (!photoCache[c.id]) photoCache[c.id] = loadImage(`../${c.photo}`).catch(() => null);
@@ -291,7 +297,7 @@ async function renderSdPanels() {
       const f = await sdOf(c, kind);
       return `<div class="sd" data-id="${c.id}" data-kind="${kind}">
         <div class="sd-img">${f ? `<img src="${f.img.src}" alt="">` : `<span>${label}<br>없음</span>`}</div>
-        <div class="sd-label">${label}${kind === "art" ? "<small>선택 · 틀에 연하게</small>" : ""}</div>
+        <div class="sd-label">${label}${kind === "art" ? `<small>${(window.PAIR_FULL || []).includes(c.id) ? "선택 · 없으면 프로필 전신" : "선택 · 없으면 프로필 두상"}</small>` : ""}</div>
         <div class="sd-btns">
           <button type="button" class="mini" data-act="up">${f ? "바꾸기" : "올리기"}</button>
           ${f ? `<button type="button" class="mini ghost" data-act="del">지우기</button>` : ""}
@@ -424,8 +430,8 @@ async function renderPreview() {
   const token = ++previewToken;
   const st = currentStory();
   const people = await Promise.all(sel.map(async (c) => {
-    const [photo, small, tall, art] = await Promise.all([photoOf(c), sdOf(c, "small"), sdOf(c, "tall"), sdOf(c, "art")]);
-    return { c, mbti: mbtiFix[c.id] || c.mbti, photo, small, tall, art, colors: colorsFor(c, small, tall) };
+    const [photo, full, small, tall, art] = await Promise.all([photoOf(c), fullOf(c), sdOf(c, "small"), sdOf(c, "tall"), sdOf(c, "art")]);
+    return { c, mbti: mbtiFix[c.id] || c.mbti, photo, full, small, tall, art, colors: colorsFor(c, small, tall) };
   }));
   const title = titleOf();
   await loadFrameFonts((st ? JSON.stringify(st) : "") + title.name);
