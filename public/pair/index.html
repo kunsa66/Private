@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>태풍고 틀 생성기</title>
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#3F7FE3">
+<meta name="build" content="1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Gaegu:wght@400;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css" rel="stylesheet">
+<link rel="stylesheet" href="pair.css">
+</head>
+<body>
+<header class="top">
+  <h1 aria-label="태풍고 틀 생성기"><span>태</span><span>풍</span><span>고</span> <span class="lt">틀</span><span class="lt">생</span><span class="lt">성</span><span class="lt">기</span></h1>
+  <p>이름 두 개 → SD 넣기 → 썰 → PNG</p>
+</header>
+
+<main>
+  <section class="paper">
+    <h2>누구랑 누구?</h2>
+    <div class="slots" id="slots"></div>
+    <form id="q-form" class="search" autocomplete="off">
+      <input id="q" placeholder="이름으로 찾기" enterkeyhint="done" autocomplete="off" autocapitalize="off" spellcheck="false">
+    </form>
+    <div id="rosters">
+      <h3>2학년</h3><div class="chips" id="roster-2"></div>
+      <h3>1학년</h3><div class="chips" id="roster-1"></div>
+    </div>
+  </section>
+  <p class="hint" id="pick-hint">A, B 칸을 누르고 명단에서 골라주세요</p>
+
+  <div id="work" hidden>
+    <section class="paper">
+      <h2>SD 이미지</h2>
+      <p class="sub">한 번 올리면 저장돼서 다음부턴 안 넣어도 돼요. 흰 배경은 자동으로 지워져요.</p>
+      <p class="warn" id="api-note" hidden>지금은 서버에 연결이 안 돼서, 올린 이미지는 이 화면에서만 쓰여요.</p>
+      <div id="sd-panels"></div>
+      <h2 class="mt">틀</h2>
+      <div class="mode" id="mode"></div>
+    </section>
+
+    <section class="paper">
+      <h2>썰</h2>
+      <div id="story-note"></div>
+      <div class="row">
+        <button type="button" class="btn ghost" id="reload">새 썰 확인</button>
+      </div>
+      <details class="edit" id="edit-box">
+        <summary>✎ 글자 고치기 <small>(이번 저장에만 적용)</small></summary>
+        <div id="edit-fields"></div>
+        <button type="button" class="mini ghost" id="edit-reset">원래대로</button>
+      </details>
+    </section>
+
+    <section class="paper">
+      <h2>미리보기</h2>
+      <img id="preview" alt="페어 틀 미리보기">
+      <p class="sub center">폰은 이미지를 꾹 눌러 저장해도 돼요</p>
+      <a class="btn wide" id="save" href="#" download>PNG 저장</a>
+    </section>
+  </div>
+</main>
+
+<input type="file" id="file" accept="image/*" hidden>
+<div class="busy" id="busy" hidden><span>이미지 손질 중…</span></div>
+
+<script src="../data.js"></script>
+<script src="roster.js"></script>
+<script src="frame.js"></script>
+<script src="pair.js"></script>
+</body>
+</html>

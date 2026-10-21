@@ -22,3 +22,15 @@
 ## 내 PC에서 미리 보기
 
 `서버실행.bat` 더블클릭 → http://localhost:8080
+
+## 태풍고 틀 생성기 (`/pair/`)
+
+주소: https://private.kunsa6667.workers.dev/pair/
+
+1. 이름 두 개 고르기 (명단은 `public/pair/roster.js`)
+2. SD 이미지 올리기: 작은 SD / 길쭉한 SD. 흰 배경은 자동으로 지우고 여백을 잘라서 저장 (Cloudflare KV, `/api/sd`). 한 번 올리면 다음부터는 자동으로 나옴
+3. 썰: 폰 Claude 앱 → Code 탭 → `kunsa66/Private` 세션에서 "A × B 써줘" → Claude가 `public/pair/stories.json`에 넣고 푸시 (규칙은 `CLAUDE.md`)
+4. 사이트에서 "새 썰 확인" → 미리보기 → PNG 저장 (2000×1560)
+
+- 틀 디자인: `public/pair/frame.js`
+- 화면: `public/pair/index.html`, `pair.js`, `pair.css`

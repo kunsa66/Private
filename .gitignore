@@ -3,3 +3,4 @@ deploy.zip
 .wrangler/
 node_modules/
 .claude/
+public/pair/_test/
