@@ -482,39 +482,60 @@ function drawCards(ctx, story, seedKey, writers) {
   const layout = CARD_LAYOUTS[Math.floor(rand() * CARD_LAYOUTS.length)];
   const flip = layout === CARD_LAYOUTS[1];
   const placed = [];
+  // 본문 글씨: 썰에 화자(narrator)가 있으면 네 장 모두 그 사람 손글씨, 없으면 A·B 번갈아.
+  // 글 길이에 맞춰 카드 높이를 정하고(짧으면 카드도 짧게), 모자라면 글씨를 줄임. 줄 노트 간격도 글씨에 맞춤
+  const narrator = story && story.narrator && writers ? writers.find((c) => c.id === story.narrator) : null;
+  const fitBody = (i, w, pl, pr, maxH) => {
+    const text = story && story.parts ? story.parts[PARTS[i][0]] : "";
+    if (!text) return null;
+    const who = narrator || (writers ? writers[i % 2] : null);
+    const girl = who && who.gender === "여";
+    const font = girl ? FF.handGirl : FF.handBoy;
+    const sizes = girl ? [29, 28, 27, 26, 25, 24, 23, 22, 21] : [32, 31, 30, 29, 28, 27, 26, 25, 24, 23, 22];
+    let body = null;
+    for (const size of sizes) {
+      const lh = Math.round(size * 1.08 + 3);
+      ctx.font = `400 ${size}px ${font}`;
+      const lines = wrap(ctx, text, w - pl - pr);
+      body = { font, size, lh, lines, need: 143 + (lines.length - 1) * lh + 46 };
+      if (body.need <= maxH) break;
+    }
+    const maxL = Math.floor((maxH - 189) / body.lh) + 1;
+    if (body.lines.length > maxL) {
+      body.lines = body.lines.slice(0, maxL);
+      body.lines[maxL - 1] = body.lines[maxL - 1].replace(/.$/, "…");
+    }
+    return body;
+  };
+  // 줄마다 두 장 중 긴 쪽에 맞춰 높이를 정하고, 엇갈린 칸(조금 낮게 붙는 쪽)은 살짝 내림
+  // 해시태그 바로 아래(테이프가 살짝 겹침)에서 시작, 남는 공간은 아래쪽에 조금만 남게
+  const AREA_TOP = 298, AREA_BOTTOM = 1360, GAP = 34, MIN_H = 440, STAGGER = 26;
+  let cap = 540, cards;
+  for (;;) {
+    cards = layout.map(([dx, , w], i) => ({ i, dx, w, pad: CARD_PAD[i], body: fitBody(i, w, CARD_PAD[i][0], CARD_PAD[i][1], cap) }));
+    const rowH = [0, 1].map((r) => Math.min(cap, Math.max(MIN_H, ...cards.slice(r * 2, r * 2 + 2).map((c) => (c.body ? c.body.need : 470)))));
+    const total = rowH[0] + STAGGER + GAP + rowH[1] + STAGGER;
+    if (total <= AREA_BOTTOM - AREA_TOP || cap <= 400) {
+      const top = AREA_TOP + Math.max(0, AREA_BOTTOM - AREA_TOP - total) * 0.25;
+      // 원래 배치표에서 더 낮게 붙는 칸은 STAGGER만큼 내려서 엇갈리게
+      const low = [0, 1].map((r) => (layout[r * 2][1] > layout[r * 2 + 1][1] ? r * 2 : r * 2 + 1));
+      const row2Top = top + rowH[0] + STAGGER + GAP;
+      cards.forEach((c) => {
+        const r = c.i >> 1;
+        c.h = rowH[r];
+        c.y = (r ? row2Top : top) + (low[r] === c.i ? STAGGER : 0);
+      });
+      break;
+    }
+    cap -= 20;
+  }
   PARTS.forEach(([key, label], i) => {
-    const text = story && story.parts ? story.parts[key] : "";
-    const [dx, dy, w, h, r0] = layout[i];
-    const [pl, pr] = CARD_PAD[i];
-    const rot = r0;
-    const x = cx0 + dx, y = dy;
+    const { dx, w, h, y: cy, pad: [pl, pr], body } = cards[i];
+    const rot = layout[i][4];
+    const x = cx0 + dx, y = cy;
     // 좌우 반전 배치면 위 두 장의 종이도 서로 바꿔서, 포스트잇은 늘 짧은 칸에
     const style = CARD_STYLE[flip && i < 2 ? 1 - i : i];
     const kind = style.paper;
-    // 본문 글씨: 썰에 화자(narrator)가 있으면 네 장 모두 그 사람 손글씨, 없으면 A·B 번갈아
-    // 글이 길면 글씨를 줄여서 맞추고, 줄 노트의 줄 간격도 글씨에 맞춤
-    let body = null;
-    if (text) {
-      const narrator = story.narrator && writers ? writers.find((c) => c.id === story.narrator) : null;
-      const who = narrator || (writers ? writers[i % 2] : null);
-      const girl = who && who.gender === "여";
-      const font = girl ? FF.handGirl : FF.handBoy;
-      const sizes = girl ? [30, 29, 28, 27, 26, 25, 24, 23, 22, 21] : [34, 33, 32, 31, 30, 29, 28, 27, 26, 25, 24, 23, 22];
-      for (const size of sizes) {
-        const lh = Math.round(size * 1.08 + 3);
-        const maxLines = Math.floor((h - 150) / lh) + 1;
-        ctx.font = `400 ${size}px ${font}`;
-        const lines = wrap(ctx, text, w - pl - pr);
-        body = { font, size, lh, lines };
-        if (lines.length <= maxLines) break;
-      }
-      // 제일 작게 해도 넘치면 마지막 줄을 … 으로
-      const maxL = Math.floor((h - 150) / body.lh) + 1;
-      if (body.lines.length > maxL) {
-        body.lines = body.lines.slice(0, maxL);
-        body.lines[maxL - 1] = body.lines[maxL - 1].replace(/.$/, "…");
-      }
-    }
     ctx.save();
     ctx.translate(x + w / 2, y + h / 2); ctx.rotate(rot); ctx.translate(-w / 2, -h / 2);
     const paper = document.createElement("canvas");
